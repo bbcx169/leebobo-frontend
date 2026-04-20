@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* 客製化捲軸 */
+.custom-scrollbar::-webkit-scrollbar, ::-webkit-scrollbar { width: 8px; }
+.custom-scrollbar::-webkit-scrollbar-track, ::-webkit-scrollbar-track { background: #FAF7F2; }
+.custom-scrollbar::-webkit-scrollbar-thumb, ::-webkit-scrollbar-thumb { background: #D2B48C; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:hover { background: #A52A2A; }
+
+/* 玻璃擬物化與背景設定 */
+.glass-panel-light { 
+  background: rgba(250, 247, 242, 0.7); 
+  backdrop-filter: blur(12px); 
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5); 
+  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.05);
+}
+
+.glass-nav-scrolled { 
+  background: rgba(255, 255, 255, 0.95); 
+  backdrop-filter: blur(8px); 
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.05); 
+}
+
+.bg-traditional-pattern { 
+  background-color: #FAF7F2;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cpath d='M54 48v-6h-6v6h-6V24H18v18h-6v6h6v6h6V36h24v18h6v-6h-6v-6h-6zM18 12V6h6V0h6v24H6v-6h12zM6 48v-6h6v-6H0v6h6zM42 6V0h-6v18h24v-6H42V6z' fill='%23d2b48c' fill-opacity='0.12'/%3E%3C/svg%3E");
+}
+
+.bg-wood-texture { 
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.05' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+/* 滾動淡入動畫 */
+.fade-in-up { 
+  opacity: 0; 
+  transform: translateY(30px);
+  transition: opacity 1s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.fade-in-up.is-visible { 
+  opacity: 1; 
+  transform: translateY(0); 
+}
+
+.img-zoom { transition: transform 0.8s ease; }
+.img-container:hover .img-zoom { transform: scale(1.04); }
+iframe { border-radius: 2rem; }
