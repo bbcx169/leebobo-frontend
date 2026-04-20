@@ -1,0 +1,41 @@
+# 這是自動化佈署的腳本名稱
+name: Deploy to GitHub Pages
+
+on:
+  # 當 main 分支有 push 動作時觸發
+  push:
+    branches: [ "main" ]
+
+# 設定權限，允許寫入 GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build_site:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload Artifacts
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # 注意：Vite 編譯後的資料夾預設是 dist
+          path: 'dist/'
+
+      - name: Deploy
+        uses: actions/deploy-pages@v4
