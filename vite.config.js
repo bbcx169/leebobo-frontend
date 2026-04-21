@@ -1,9 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import basicSsl from '@vitejs/plugin-basic-ssl' // 🚀 1. 新增：載入 HTTPS 外掛
 
-// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
-  // 加上這行，確保資源路徑正確。請務必與你的 GitHub 儲存庫名稱一致
-  base: '/leebobo-frontend/', 
+  // 💡 顧問提示：請保留您原本的 base 設定（對應您的 GitHub 專案名稱）
+  base: '/leebobo-frontend/',
+  
+  plugins: [
+    react(),
+    basicSsl() // 🚀 2. 新增：啟用 HTTPS
+  ],
 })

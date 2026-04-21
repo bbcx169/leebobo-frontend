@@ -53,3 +53,11 @@
 .img-zoom { transition: transform 0.8s ease; }
 .img-container:hover .img-zoom { transform: scale(1.04); }
 iframe { border-radius: 2rem; }
+
+/* ==========================================
+   🚀 後台管理系統 (Admin) 專屬樣式補充
+   ========================================== */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.toggle-checkbox:checked { right: 0; border-color: #06C755; }
+.toggle-checkbox:checked + .toggle-label { background-color: #06C755; }
