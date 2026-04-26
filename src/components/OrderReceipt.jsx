@@ -22,49 +22,58 @@ const OrderReceipt = ({ order, products }) => {
   // 處理時間格式：將 HH:mm:ss 轉換為 HH:mm (不顯示秒數)
   const displayTime = p.orderTime ? p.orderTime.split(':').slice(0, 2).join(':') : '';
 
-  // 判斷是否為自取/外縣市
-  const isLocked = p.deliveryCity === '外縣市' || p.deliveryCity === '自取';
+  // 判斷是否為自取 (與 Checkout 邏輯一致)
+  const isLocked = p.deliveryCity === '自取';
 
-  // 💡 智慧解析：從 specificDetails 中提取出對應的欄位，完美還原 Checkout 的排版
-  let fullAddress = isLocked ? '配合商家時間地點自取' : p.deliveryCity;
-  let locationName = '';
-  let groomName = '';
+  // 💡 顧問優化：統一處理「未提供」顯示的工具函數，確保 UI 一致性
+  const renderDetailRow = (label, value) => (
+    <React.Fragment>
+      <span className="text-darkWood/60 font-medium">{label}</span>
+      <span className={`text-darkWood font-bold ${!value || value === '未提供' ? 'text-gray-400 font-normal' : ''}`}>
+        {value || '未提供'}
+      </span>
+    </React.Fragment>
+  );
+
+  // 💡 智慧解析：從 specificDetails 中提取出欄位，還原 Checkout 的排版
+  let detailAddress = '';
+  let locationText = '';
 
   if (p.specificDetails) {
     const lines = p.specificDetails.split('\n');
     
-    // 找尋地址
-    const addrLine = lines.find(l => l.startsWith('地址：'));
-    if (addrLine && !isLocked) fullAddress = addrLine.replace('地址：', '');
+    // 找尋地址 (含自取與配送標籤)
+    const addrLine = lines.find(l => l.startsWith('地址：') || l.startsWith('取貨地址：'));
+    if (addrLine) {
+        detailAddress = addrLine.replace(/^(地址：|取貨地址：)/, '').trim();
+    }
     
-    // 找尋地點名稱或餐廳
-    const locLine = lines.find(l => l.startsWith('地點：') || l.startsWith('餐廳：'));
-    if (locLine) locationName = locLine.replace(/^(地點：|餐廳：)/, '');
-
-    // 找尋新人資訊
-    const groomLine = lines.find(l => l.startsWith('新人：'));
-    if (groomLine) groomName = groomLine.replace('新人：', '');
+    // 找尋地點名稱
+    const locLine = lines.find(l => l.startsWith('地點：'));
+    if (locLine) {
+        locationText = locLine.replace('地點：', '').trim();
+    }
   }
 
   return (
     <div className="bg-white p-6 md:p-8 rounded-2xl border border-warmWood/30 shadow-sm space-y-6 text-sm animate-[fadeIn_0.5s_ease-out]">
       
-      {/* 💡 標頭：訂購單編號字體與時間大小一致，但保持粗體 */}
+      {/* 標頭區塊 */}
       <div className="text-center border-b border-warmWood/20 pb-6 mb-2">
         <h2 className="text-3xl md:text-4xl font-bold text-amberRed mb-4 tracking-widest font-serif">
           李伯伯糖葫蘆
         </h2>
         <div className="text-darkWood/80 space-y-1 font-medium">
           <p className="text-base font-bold text-darkWood">
-            訂購單編號 ： {orderNumber || p.orderNumber}
+            訂購單編號 ： {orderNumber || p.orderNumber || '未提供'}
           </p>
           <p className="text-base opacity-90">
-            訂購時間：{p.orderDate} {displayTime}
+            訂購時間：{p.orderDate || '未提供'} {displayTime}
           </p>
         </div>
       </div>
 
-      {/* 區塊 1：活動資訊 (與 Checkout 完全同步) */}
+      {/* 區塊 1：活動資訊 (完美比照 Checkout 排序) */}
       <div className="space-y-3">
         <h3 className="text-base font-bold text-amberRed border-b border-warmWood/20 pb-2 flex items-center gap-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,28 +82,27 @@ const OrderReceipt = ({ order, products }) => {
           活動資訊
         </h3>
         <div className="grid grid-cols-[80px_1fr] gap-y-2">
-          <span className="text-darkWood/60 font-medium">活動類型</span>
-          <span className="text-darkWood font-bold">{p.eventType}</span>
+          {renderDetailRow('活動類型', p.eventType)}
+          {renderDetailRow('活動日期', p.eventDate)}
           
-          <span className="text-darkWood/60 font-medium">活動日期</span>
-          <span className="text-darkWood font-bold">{p.eventDate}</span>
-          
-          <span className="text-darkWood/60 font-medium">收貨時間</span>
-          <span className="text-darkWood font-bold">{p.eventTime}</span>
-          
-          <span className="text-darkWood/60 font-medium">配送地址</span>
-          <span className="text-darkWood font-bold leading-relaxed">{fullAddress}</span>
-          
-          {!isLocked && locationName ? (
+          {isLocked ? (
             <>
-              <span className="text-darkWood/60 font-medium">地點名稱</span>
-              <span className="text-darkWood font-bold">{locationName}</span>
+              {/* 自取模式：時間與地址自動帶入提示文字 */}
+              {renderDetailRow('取貨時間', '需配合商家時間地點自取')}
+              {renderDetailRow('取貨地址', '需配合商家時間地點自取')}
             </>
-          ) : null}
+          ) : (
+            <>
+              {/* 配送模式：依序顯示收貨時間、地點、地址 */}
+              {renderDetailRow('收貨時間', p.eventTime)}
+              {renderDetailRow('地點名稱', locationText)}
+              {renderDetailRow('配送地址', detailAddress)}
+            </>
+          )}
         </div>
       </div>
 
-      {/* 區塊 2：聯絡資訊 (與 Checkout 完全同步) */}
+      {/* 區塊 2：聯絡資訊 (合併姓名與手機格式) */}
       <div className="space-y-3 pt-2">
         <h3 className="text-base font-bold text-amberRed border-b border-warmWood/20 pb-2 flex items-center gap-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -103,36 +111,15 @@ const OrderReceipt = ({ order, products }) => {
           聯絡資訊
         </h3>
         <div className="grid grid-cols-[80px_1fr] gap-y-2">
-          <span className="text-darkWood/60 font-medium">訂購人</span>
-          <span className="text-darkWood font-bold">{p.ordererName} <span className="text-darkWood/60 text-xs ml-1">({p.ordererPhone})</span></span>
-          
-          {p.ordererEmail ? (
-            <>
-              <span className="text-darkWood/60 font-medium">電子信箱</span>
-              <span className="text-darkWood font-bold">{p.ordererEmail}</span>
-            </>
-          ) : null}
-
-          <span className="text-darkWood/60 font-medium">收貨人</span>
-          <span className="text-darkWood font-bold">{p.recipientName} <span className="text-darkWood/60 text-xs ml-1">({p.recipientPhone})</span></span>
-          
-          {p.eventType === '浪漫婚禮 / 喜宴' && groomName && groomName !== '未提供' ? (
-            <>
-              <span className="text-darkWood/60 font-medium">新人資訊</span>
-              <span className="text-darkWood font-bold">{groomName}</span>
-            </>
-          ) : null}
-          
-          {p.notes ? (
-            <>
-              <span className="text-darkWood/60 font-medium">備註</span>
-              <span className="text-darkWood font-medium whitespace-pre-wrap">{p.notes}</span>
-            </>
-          ) : null}
+          {renderDetailRow('訂購人', `${p.ordererName || '未提供'}(${p.ordererPhone || '未提供'})`)}
+          {renderDetailRow('電子信箱', p.ordererEmail)}
+          {/* 根據模式切換 標籤文字 */}
+          {renderDetailRow(isLocked ? '取貨人' : '收貨人', `${p.recipientName || '未提供'}(${p.recipientPhone || '未提供'})`)}
+          {renderDetailRow('備註', p.notes)}
         </div>
       </div>
 
-      {/* 區塊 3：購買項目 (完全相同) */}
+      {/* 區塊 3：購買項目 */}
       <div className="space-y-3 bg-creamBg/50 p-4 rounded-xl border border-warmWood/20">
         <h3 className="text-base font-bold text-darkWood border-b border-warmWood/20 pb-2">購買項目</h3>
         <div className="space-y-2">

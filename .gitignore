@@ -15,4 +15,4 @@ dist/
 .env.production.local
 
 # OS files
-.DS_Store
+.DS_Store".clasprc.json" 
