@@ -1,39 +1,74 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import liff from '@line/liff';
 
-// 引入拆分後的元件
+// 🚀 引入您先前拆解出來的三個展示元件
 import DashboardStats from '../components/Admin/DashboardStats';
 import OrderTable from '../components/Admin/OrderTable';
 import AdminModals from '../components/Admin/AdminModals';
 
-// 常數設定
+// ==========================================
+// 全域常數設定
+// ==========================================
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzf8kJ6Ka8yGabg--MCRJ8eyucBbsGRDbceGEeH-CQDLqOMXhTCysZVrPKL0MLpSg4L/exec';
 const LIFF_ID = '2009807397-WPVPBokl';
-const productMapping = { 1: "蕃茄 (小/喜糖)", 2: "蕃茄蜜餞 (小/喜糖)", 3: "鳥梨 (小/喜糖)", 4: "蕃茄+鳥梨 (小/喜糖)", 5: "承租掃帚", 6: "蕃茄 (經典)", 7: "蕃茄蜜餞 (經典)", 8: "鳥梨 (經典)" };
+
+const productMapping = {
+  1: "蕃茄 (小/喜糖)", 2: "蕃茄蜜餞 (小/喜糖)", 3: "鳥梨 (小/喜糖)", 4: "蕃茄+鳥梨 (小/喜糖)",
+  5: "承租掃帚", 6: "蕃茄 (經典)", 7: "蕃茄蜜餞 (經典)", 8: "鳥梨 (經典)"
+};
 
 export default function AdminDashboard() {
-  // 核心狀態
-  const [authStatus, setAuthStatus] = useState('checking');
+  // ==========================================
+  // 1. 核心狀態管理
+  // ==========================================
+  const [authStatus, setAuthStatus] = useState('checking'); // checking, unauth, unauthorized_user, logged_in
   const [userProfile, setUserProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+  
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [alertMsg, setAlertMsg] = useState(null);
+  
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // 彈窗狀態
   const [settings, setSettings] = useState({ reminderEnabled: true, reminderTime: '11:00' });
-  const [resendModal, setResendModal] = useState({ isOpen: false, order: null, email: '' });
-  const [editModal, setEditModal] = useState({ isOpen: false, order: null, eventDate: '', eventTime: '' });
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [isResending, setIsResending] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [alertMsg, setAlertMsg] = useState(null);
+  
+  const [resendModal, setResendModal] = useState({ isOpen: false, order: null, email: '' });
+  const [isResending, setIsResending] = useState(false);
+
+  const [editModal, setEditModal] = useState({ 
+    isOpen: false, 
+    order: null, 
+    eventDate: '', 
+    eventTime: '', 
+    location: '' 
+  });
+  const [isUpdating, setIsUpdating] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // 初始化與登入
+  // ==========================================
+  // 2. API 呼叫與資料獲取
+  // ==========================================
+  const callGasApi = async (payload) => {
+    try {
+      const response = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'error') throw new Error(result.message || '處理失敗');
+      return result;
+    } catch (err) {
+      console.error('API Error:', err);
+      throw err;
+    }
+  };
+
   useEffect(() => {
-    async function init() {
+    async function initializeLiff() {
       try {
         await liff.init({ liffId: LIFF_ID });
         if (liff.isLoggedIn()) {
@@ -43,20 +78,20 @@ export default function AdminDashboard() {
           if (data.status === 'success' && data.isAdmin) {
             setUserProfile(profile);
             setAuthStatus('logged_in');
-            fetchOrders();
-            fetchSettings();
-          } else setAuthStatus('unauthorized_user');
-        } else setAuthStatus('unauth');
-      } catch (err) { setAuthStatus('unauth'); }
+            fetchOrders(); 
+            fetchSettings(); 
+          } else {
+            setAuthStatus('unauthorized_user');
+          }
+        } else {
+          setAuthStatus('unauth');
+        }
+      } catch (err) {
+        setAuthStatus('unauth');
+      }
     }
-    init();
+    initializeLiff();
   }, []);
-
-  // API 呼叫方法
-  const callGasApi = async (payload) => {
-    const res = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
-    return await res.json();
-  };
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -64,95 +99,248 @@ export default function AdminDashboard() {
       const res = await fetch(`${SCRIPT_URL}?action=get_all_orders`);
       const data = await res.json();
       if (data.status === 'success') setOrders(data.data);
-    } catch (err) { setAlertMsg("網路連線錯誤"); }
-    finally { setIsLoading(false); }
+    } catch (err) {
+      setAlertMsg("無法取得訂單資料，請檢查網路連線");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const fetchSettings = async () => {
-    const res = await fetch(`${SCRIPT_URL}?action=get_settings`);
-    const data = await res.json();
-    if (data.status === 'success') setSettings(data.data);
+    try {
+      const res = await fetch(`${SCRIPT_URL}?action=get_settings`);
+      const data = await res.json();
+      if (data.status === 'success') setSettings(data.data);
+    } catch (err) {}
   };
 
-  // 業務處理邏輯 (與 Stage 2 相同，僅傳遞給元件)
-  const urgentOrders = useMemo(() => {
-    const today = new Date(); today.setHours(0,0,0,0);
-    const limit = new Date(today); limit.setDate(today.getDate() + 3);
-    return orders.filter(o => o.eventDate && new Date(o.eventDate) >= today && new Date(o.eventDate) <= limit);
-  }, [orders]);
-
-  const { dailyOrders, dailyMaterials } = useMemo(() => {
-    const dOrders = orders.filter(o => o.eventDate === selectedDate);
-    const mat = {}; let total = 0;
-    dOrders.forEach(o => Object.entries(o.cart || {}).forEach(([id, qty]) => {
-      const pid = parseInt(id); if(!mat[pid]) mat[pid] = { name: productMapping[pid], qty: 0 };
-      mat[pid].qty += qty; if(pid !== 5) total += qty;
-    }));
-    return { dailyOrders: dOrders, dailyMaterials: { items: mat, totalCandies: total } };
-  }, [orders, selectedDate]);
-
-  const filteredOrders = useMemo(() => orders.filter(o => 
-    !searchTerm || [o.orderNumber, o.ordererName, o.ordererPhone].some(v => v?.toLowerCase().includes(searchTerm.toLowerCase()))
-  ), [orders, searchTerm]);
-
-  // 頁面切換控制
+  const handleLogin = () => liff.login({ redirectUri: window.location.href });
   const handleLogout = () => { liff.logout(); window.location.reload(); };
 
-  if (authStatus === 'checking') return <div className="h-screen flex items-center justify-center">驗證中...</div>;
-  if (authStatus !== 'logged_in') return <div className="h-screen flex items-center justify-center">請重新登入</div>;
+  // 🚀 地點與時間更新 API 串接
+  const handleUpdateOrderTime = async () => {
+    if (!editModal.eventDate || !editModal.eventTime) return alert("請填寫日期與時間");
+    setIsUpdating(true);
+    try {
+      await callGasApi({ 
+        action: 'update_order_time', 
+        orderNumber: editModal.order.orderNumber, 
+        newDate: editModal.eventDate, 
+        newTime: editModal.eventTime,
+        newDetails: editModal.location 
+      });
+      setAlertMsg("✅ 訂單與 PDF 已成功更新！");
+      setEditModal({ isOpen: false, order: null, eventDate: '', eventTime: '', location: '' });
+      fetchOrders();
+    } catch (err) {
+      setAlertMsg("❌ 更新失敗：" + err.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleResendPDF = async () => {
+    if (!resendModal.email) return alert("請輸入 Email");
+    setIsResending(true);
+    try {
+      await callGasApi({ action: 'resendPdf', orderNumber: resendModal.order.orderNumber, email: resendModal.email });
+      setAlertMsg(`✅ 已補發至 ${resendModal.email}`);
+      setResendModal({ isOpen: false, order: null, email: '' });
+    } catch (err) {
+      setAlertMsg("❌ 補發失敗");
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    setIsSavingSettings(true);
+    try {
+      await callGasApi({ action: 'save_settings', ...settings });
+      setAlertMsg("✅ 系統設定已更新！");
+    } catch (err) {
+      setAlertMsg("❌ 儲存失敗");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  // ==========================================
+  // 3. 資料處理邏輯
+  // ==========================================
+  const { dailyOrders, dailyMaterials } = useMemo(() => {
+    const dOrders = orders.filter(o => o.eventDate === selectedDate).sort((a, b) => a.eventTime.localeCompare(b.eventTime));
+    const materials = {}; let totalCandies = 0;
+    dOrders.forEach(order => {
+      if (!order.cart) return;
+      Object.entries(order.cart).forEach(([id, qty]) => {
+        const pid = parseInt(id);
+        if (!materials[pid]) materials[pid] = { name: productMapping[pid] || `商品(${pid})`, qty: 0 };
+        materials[pid].qty += qty; if (pid !== 5) totalCandies += qty; 
+      });
+    });
+    return { dailyOrders: dOrders, dailyMaterials: { items: materials, totalCandies } };
+  }, [orders, selectedDate]);
+
+  const filteredOrders = useMemo(() => {
+    if (!searchTerm) return orders;
+    const t = searchTerm.toLowerCase();
+    return orders.filter(o => o.orderNumber?.toLowerCase().includes(t) || o.ordererName?.toLowerCase().includes(t) || o.ordererPhone?.includes(t));
+  }, [orders, searchTerm]);
+
+  // ==========================================
+  // 4. 權限渲染判斷 (字體大 2 號)
+  // ==========================================
+  if (authStatus === 'checking') return <div className="h-screen flex items-center justify-center bg-gray-50 text-2xl font-bold">驗證中...</div>;
+  
+  if (authStatus === 'unauth') return (
+    <div className="h-screen flex items-center justify-center bg-gray-100 p-6">
+      <div className="bg-white p-12 rounded-3xl shadow-xl text-center max-w-md w-full">
+        <h1 className="text-3xl font-bold text-amberRed mb-8 tracking-widest">李伯伯管理後台</h1>
+        <button onClick={handleLogin} className="w-full bg-[#06C755] text-white px-10 py-5 rounded-2xl font-bold text-xl shadow-lg hover:scale-105 transition-transform">
+          LINE 管理員登入
+        </button>
+      </div>
+    </div>
+  );
+
+  if (authStatus === 'unauthorized_user') return <div className="h-screen flex items-center justify-center bg-gray-50 text-red-500 font-bold text-2xl">抱歉，您沒有管理員權限。</div>;
 
   return (
-    <div className="flex h-screen bg-gray-100 relative">
-      {/* 側邊欄與行動版 Navbar (簡略顯示，保持與原版一致) */}
-      <aside className="hidden md:flex w-64 bg-white shadow-md flex-col">
-        <div className="p-6 border-b text-center font-bold text-amberRed text-xl">李伯伯糖葫蘆</div>
-        <nav className="flex-1 p-4 space-y-2">
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full text-left px-4 py-3 rounded-xl ${activeTab === 'dashboard' ? 'bg-amberRed/10 text-amberRed font-bold' : ''}`}>排程與備料</button>
-          <button onClick={() => setActiveTab('orders')} className={`w-full text-left px-4 py-3 rounded-xl ${activeTab === 'orders' ? 'bg-amberRed/10 text-amberRed font-bold' : ''}`}>訂單總覽</button>
-          <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-red-500">安全登出</button>
+    <div className="flex h-screen overflow-hidden bg-gray-100 text-darkWood">
+      
+      {/* 🚀 側邊導覽列 (字體加大) */}
+      <aside className={`fixed md:static inset-y-0 left-0 w-80 bg-white shadow-xl z-50 flex flex-col transform transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="p-8 border-b border-gray-100">
+           <h1 className="text-3xl font-bold text-amberRed tracking-widest">李伯伯後台</h1>
+           <p className="text-sm text-gray-400 mt-2 font-medium">版本: 2.0 (全字體加大版)</p>
+        </div>
+        
+        <div className="px-8 py-6 bg-gray-50 border-b border-gray-100 flex items-center gap-4">
+          {userProfile?.pictureUrl && <img src={userProfile.pictureUrl} className="w-14 h-14 rounded-full border-2 border-white shadow-sm"/>}
+          <div>
+            <p className="text-lg font-bold text-gray-800">{userProfile?.displayName}</p>
+            <p className="text-xs text-green-600 font-bold">● 線上管理中</p>
+          </div>
+        </div>
+
+        <nav className="flex-1 p-6 space-y-4">
+          <button onClick={() => {setActiveTab('dashboard'); setIsMobileMenuOpen(false);}} className={`w-full text-left px-6 py-5 rounded-2xl text-xl transition-all ${activeTab === 'dashboard' ? 'bg-amberRed/10 text-amberRed font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>
+            📊 排程與備料
+          </button>
+          <button onClick={() => {setActiveTab('orders'); setIsMobileMenuOpen(false);}} className={`w-full text-left px-6 py-5 rounded-2xl text-xl transition-all ${activeTab === 'orders' ? 'bg-amberRed/10 text-amberRed font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>
+            📋 訂單總覽
+          </button>
+          <button onClick={() => {setActiveTab('settings'); setIsMobileMenuOpen(false);}} className={`w-full text-left px-6 py-5 rounded-2xl text-xl transition-all ${activeTab === 'settings' ? 'bg-amberRed/10 text-amberRed font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>
+            ⚙️ 系統設定
+          </button>
         </nav>
+        
+        <div className="p-6 border-t border-gray-100">
+          <button onClick={handleLogout} className="w-full py-4 text-lg text-red-500 font-bold hover:bg-red-50 rounded-2xl transition-colors border border-red-100">
+            登出系統
+          </button>
+        </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto p-8 relative">
-        {isLoading && <div className="absolute inset-0 bg-white/50 z-20 flex items-center justify-center">讀取中...</div>}
-        
-        {activeTab === 'dashboard' ? (
+      {/* 🚀 主內容區 */}
+      <main className="flex-1 overflow-y-auto p-6 md:p-12 relative scrollbar-hide">
+        {isLoading && (
+          <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-20 flex items-center justify-center">
+            <div className="bg-white px-8 py-4 rounded-full shadow-2xl text-amberRed font-bold text-xl animate-pulse border border-amberRed/20">更新資料中...</div>
+          </div>
+        )}
+
+        {/* 1. 排程與備料看板 */}
+        {activeTab === 'dashboard' && (
           <DashboardStats 
-            orders={orders} urgentOrders={urgentOrders} 
-            selectedDate={selectedDate} setSelectedDate={setSelectedDate}
-            dailyOrders={dailyOrders} dailyMaterials={dailyMaterials}
-          />
-        ) : (
-          <OrderTable 
-            searchTerm={searchTerm} setSearchTerm={setSearchTerm} 
-            filteredOrders={filteredOrders}
-            onEditClick={(o) => setEditModal({ isOpen: true, order: o, eventDate: o.eventDate, eventTime: o.eventTime })}
-            onResendClick={(o) => setResendModal({ isOpen: true, order: o, email: o.ordererEmail })}
+            orders={orders} 
+            selectedDate={selectedDate} 
+            setSelectedDate={setSelectedDate} 
+            dailyOrders={dailyOrders} 
+            dailyMaterials={dailyMaterials} 
           />
         )}
 
+        {/* 2. 訂單總覽表格 */}
+        {activeTab === 'orders' && (
+          <OrderTable 
+            searchTerm={searchTerm} 
+            setSearchTerm={setSearchTerm} 
+            filteredOrders={filteredOrders}
+            onEditClick={(o) => setEditModal({ 
+              isOpen: true, 
+              order: o, 
+              eventDate: o.eventDate || '', 
+              eventTime: o.eventTime || '', 
+              location: o.specificDetails || '' 
+            })}
+            onResendClick={(o) => setResendModal({ isOpen: true, order: o, email: o.ordererEmail || '' })}
+          />
+        )}
+
+        {/* 3. 系統設定 */}
+        {activeTab === 'settings' && (
+          <div className="max-w-3xl mx-auto space-y-10 animate-[fadeIn_0.3s_ease-out]">
+            <header>
+              <h2 className="text-4xl font-bold text-gray-800">系統設定</h2>
+              <p className="text-xl text-gray-500 mt-2">管理 LINE 每日提醒機器人作業</p>
+            </header>
+            
+            <div className="bg-white rounded-3xl p-10 shadow-sm border border-gray-100">
+              <h3 className="text-2xl font-bold text-gray-800 mb-8 border-b border-gray-100 pb-6">LINE 每日出貨提醒</h3>
+              <div className="space-y-8">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xl font-bold text-gray-700">啟用提醒功能</label>
+                    <p className="text-base text-gray-400 mt-1">開啟後，系統將於每日指定時間發送明日訂單報表。</p>
+                  </div>
+                  <input 
+                    type="checkbox" 
+                    checked={settings.reminderEnabled} 
+                    onChange={e => setSettings({...settings, reminderEnabled: e.target.checked})} 
+                    className="w-8 h-8 accent-amberRed rounded-lg"
+                  />
+                </div>
+                
+                <div className={`transition-all ${settings.reminderEnabled ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+                  <label className="block text-lg font-bold text-gray-700 mb-3">發送時間</label>
+                  <input 
+                    type="time" 
+                    value={settings.reminderTime} 
+                    onChange={e => setSettings({...settings, reminderTime: e.target.value})} 
+                    className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-xl outline-none focus:ring-2 focus:ring-amberRed"
+                  />
+                </div>
+                
+                <div className="pt-6 border-t border-gray-100">
+                  <button 
+                    onClick={handleSaveSettings} 
+                    disabled={isSavingSettings}
+                    className="w-full md:w-auto px-12 py-4 bg-darkWood text-white font-bold text-xl rounded-2xl hover:bg-black transition-all shadow-lg disabled:opacity-50"
+                  >
+                    {isSavingSettings ? '儲存中...' : '儲存設定'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 🚀 彈窗組件大集合 */}
         <AdminModals 
           alertMsg={alertMsg} setAlertMsg={setAlertMsg}
-          editModal={editModal} setEditModal={setEditModal} isUpdating={isUpdating}
-          onUpdateOrderTime={async () => {
-            setIsUpdating(true);
-            try {
-              await callGasApi({ action: 'update_order_time', orderNumber: editModal.order.orderNumber, newDate: editModal.eventDate, newTime: editModal.eventTime });
-              setAlertMsg("修改成功！"); setEditModal({ isOpen: false }); fetchOrders();
-            } catch (err) { setAlertMsg("修改失敗"); }
-            finally { setIsUpdating(false); }
-          }}
-          resendModal={resendModal} setResendModal={setResendModal} isResending={isResending}
-          onResendPDF={async () => {
-            setIsResending(true);
-            try {
-              await callGasApi({ action: 'admin_resend_pdf', orderNumber: resendModal.order.orderNumber, email: resendModal.email });
-              setAlertMsg("PDF 已成功補發！"); setResendModal({ isOpen: false });
-            } catch (err) { setAlertMsg("補發失敗"); }
-            finally { setIsResending(false); }
-          }}
+          editModal={editModal} setEditModal={setEditModal} isUpdating={isUpdating} onUpdateOrderTime={handleUpdateOrderTime}
+          resendModal={resendModal} setResendModal={setResendModal} isResending={isResending} onResendPDF={handleResendPDF}
         />
       </main>
+
+      {/* 手機版選單按鈕 */}
+      <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden fixed top-6 right-6 z-40 bg-white p-4 rounded-full shadow-2xl border border-gray-200 text-amberRed">
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" strokeWidth="2.5" strokeLinecap="round"/></svg>
+      </button>
+      
+      {isMobileMenuOpen && <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)}></div>}
     </div>
   );
 }

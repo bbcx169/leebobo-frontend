@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 
 // 引入全站共用元件
 import Footer from './components/Footer';
@@ -12,35 +13,59 @@ import Checkout from './pages/Checkout';
 import OrderSuccess from './pages/OrderSuccess';
 import OrderInquiry from './pages/OrderInquiry';
 
-// 🚀 新增：引入後台管理的骨架頁面
+// 引入後台管理的骨架頁面
 import AdminDashboard from './pages/AdminDashboard';
 
-function App() {
+// --------------------------------------------------------
+// 💡 AppContent 是主要應用程式邏輯，被 BrowserRouter 包覆
+// --------------------------------------------------------
+function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   // --- 全域狀態管理 ---
-  // 💡 優化：檢查初始網址，如果網址包含 '/admin' 就直接進入後台模式
-  const [currentPage, setCurrentPage] = useState(() => {
-    if (window.location.pathname.includes('/admin')) return 'admin';
-    return 'brand';
-  }); 
   const [cart, setCart] = useState({}); 
   const [alertMsg, setAlertMsg] = useState(null); 
   const [submittedOrder, setSubmittedOrder] = useState(null); 
-  
-  const [resetKey, setResetKey] = useState(Date.now()); 
-
   const [isNavScrolled, setIsNavScrolled] = useState(false); 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); 
 
+  // ==========================================
+  // 🚀 核心優化：LIFF 登入路由攔截器 (修復 OAuth 憑證遺失問題)
+  // ==========================================
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const liffStatePath = params.get('liff.state');
+
+    if (liffStatePath) {
+      console.log('偵測到 LIFF 重導向，準備跳轉至:', liffStatePath);
+      
+      // ⚠️ 關鍵修正：必須保留 LINE 傳回來的 code 和 state 參數
+      // 否則 liff.init() 會因為找不到憑證而判定為「未登入」
+      params.delete('liff.state'); // 移除 liff.state 避免跳轉死迴圈
+      const remainingParams = params.toString();
+      
+      // 重組網址：目標路徑 + 剩下的參數 (例如: /admin?code=xxx&state=xxx)
+      const destination = liffStatePath + (remainingParams ? `?${remainingParams}` : '');
+      
+      // 執行跳轉並將參數帶過去
+      navigate(destination, { replace: true });
+    }
+  }, [location.search, navigate]);
+
+  // 1. 導覽列滾動效果
   useEffect(() => {
     const handleScroll = () => setIsNavScrolled(window.scrollY > 50);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // 2. 當網址改變時，自動捲動到最上方
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [currentPage]);
+  }, [location.pathname]);
 
+  // --- 購物車邏輯 ---
   const updateCart = (productId, delta) => {
     setCart(prev => {
       const currentQty = prev[productId] || 0;
@@ -76,27 +101,33 @@ function App() {
   const cartCount = getCartTotalItems();
   const displayCount = cartCount > 99 ? '99+' : cartCount;
 
+  // --- 訂單與路由跳轉邏輯 ---
   const handleOrderSuccess = (orderData) => {
     setSubmittedOrder(orderData);
     setCart({}); 
-    setCurrentPage('success'); 
+    navigate('/success'); 
   };
 
-  const handleNavigate = (page) => { 
-    const targetPage = page === 'products' ? 'list' : page;
-    if (targetPage === 'list') {
-      setSubmittedOrder(null);
+  const handleNavigate = (path) => { 
+    if (path === '/list') {
+      setSubmittedOrder(null); 
     }
-    setCurrentPage(targetPage); 
-    setResetKey(Date.now()); 
+    navigate(path); 
     setIsMobileMenuOpen(false); 
   };
 
+  // 🚀 判斷當前是否為後台模式
+  const isAdminRoute = location.pathname.startsWith('/admin');
+
   // ==========================================
-  // 🚀 路由攔截：如果是後台模式，直接渲染後台專屬版面，不顯示前台 Navbar
+  // 後台專屬畫面渲染：不顯示前台 Navbar 與 Footer
   // ==========================================
-  if (currentPage === 'admin') {
-    return <AdminDashboard />;
+  if (isAdminRoute) {
+    return (
+      <Routes>
+        <Route path="/admin/*" element={<AdminDashboard />} />
+      </Routes>
+    );
   }
 
   // ==========================================
@@ -114,17 +145,17 @@ function App() {
       {/* --- 導覽列 --- */}
       <nav className={`fixed w-full z-50 transition-all duration-500 ${isNavScrolled ? 'px-0' : 'px-0'}`}>
         <div className={`mx-auto flex justify-between items-center max-w-7xl transition-all duration-300 ${isNavScrolled ? 'glass-nav-scrolled shadow-sm w-full px-6 py-4 rounded-none' : 'glass-panel-light mx-4 mt-4 rounded-2xl px-6 py-4'}`}>
-            <div className="font-serif text-2xl font-bold tracking-widest text-amberRed cursor-pointer" onClick={() => handleNavigate('brand')}>李伯伯糖葫蘆</div>
+            <div className="font-serif text-2xl font-bold tracking-widest text-amberRed cursor-pointer" onClick={() => handleNavigate('/')}>李伯伯糖葫蘆</div>
             
             <div className="hidden md:flex items-center space-x-8 text-sm font-medium tracking-wider text-darkWood">
-                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('brand'); }} className={`transition-colors duration-300 ${currentPage === 'brand' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>品牌故事</a>
-                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('process'); }} className={`transition-colors duration-300 ${currentPage === 'process' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>訂購流程</a>
-                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('list'); }} className={`transition-colors duration-300 ${['list', 'order', 'success'].includes(currentPage) ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>商品訂購</a>
-                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('inquiry'); }} className={`transition-colors duration-300 ${currentPage === 'inquiry' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>訂單查詢</a>
-                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('contact'); }} className={`transition-colors duration-300 ${currentPage === 'contact' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>聯絡我們</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/'); }} className={`transition-colors duration-300 ${location.pathname === '/' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>品牌故事</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/process'); }} className={`transition-colors duration-300 ${location.pathname === '/process' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>訂購流程</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/list'); }} className={`transition-colors duration-300 ${['/list', '/order', '/success'].includes(location.pathname) ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>商品訂購</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/inquiry'); }} className={`transition-colors duration-300 ${location.pathname === '/inquiry' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>訂單查詢</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/contact'); }} className={`transition-colors duration-300 ${location.pathname === '/contact' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>聯絡我們</a>
                 
-                {['list', 'order'].includes(currentPage) && (
-                    <button onClick={() => handleNavigate('order')} className="relative flex items-center justify-center w-11 h-11 rounded-full bg-amberRed text-white shadow-md hover:bg-pureWhite hover:text-amberRed transition-all ml-4 animate-bounce">
+                {['/list', '/order'].includes(location.pathname) && (
+                    <button onClick={() => handleNavigate('/order')} className="relative flex items-center justify-center w-11 h-11 rounded-full bg-amberRed text-white shadow-md hover:bg-pureWhite hover:text-amberRed transition-all ml-4 animate-bounce">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
                         {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pureWhite text-amberRed text-[10px] font-bold rounded-full h-5 min-w-[20px] px-1 flex items-center justify-center shadow-md border-2 border-amberRed">{displayCount}</span>}
                     </button>
@@ -132,8 +163,8 @@ function App() {
             </div>
 
             <div className="md:hidden flex items-center space-x-3">
-                {['list', 'order'].includes(currentPage) && (
-                    <button onClick={() => handleNavigate('order')} className="relative flex items-center justify-center w-10 h-10 rounded-full bg-amberRed text-white shadow-md hover:bg-pureWhite hover:text-amberRed transition-all animate-bounce">
+                {['/list', '/order'].includes(location.pathname) && (
+                    <button onClick={() => handleNavigate('/order')} className="relative flex items-center justify-center w-10 h-10 rounded-full bg-amberRed text-white shadow-md hover:bg-pureWhite hover:text-amberRed transition-all animate-bounce">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
                         {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pureWhite text-amberRed text-[10px] font-bold rounded-full h-5 min-w-[20px] px-1 flex items-center justify-center shadow-md border-2 border-amberRed">{displayCount}</span>}
                     </button>
@@ -146,11 +177,11 @@ function App() {
 
         {isMobileMenuOpen && (
             <div className="md:hidden glass-panel-light mx-4 mt-2 p-5 rounded-2xl flex flex-col space-y-4 text-center text-darkWood tracking-wider shadow-lg">
-                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('brand'); }} className={`py-2 border-b border-warmWood/20 ${currentPage === 'brand' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>品牌故事</a>
-                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('process'); }} className={`py-2 border-b border-warmWood/20 ${currentPage === 'process' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>訂購流程</a>
-                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('list'); }} className={`py-2 border-b border-warmWood/20 ${['list', 'order', 'success'].includes(currentPage) ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>商品訂購</a>
-                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('inquiry'); }} className={`py-2 border-b border-warmWood/20 ${currentPage === 'inquiry' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>訂單查詢</a>
-                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('contact'); }} className={`py-2 ${currentPage === 'contact' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>聯絡我們</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/'); }} className={`py-2 border-b border-warmWood/20 ${location.pathname === '/' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>品牌故事</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/process'); }} className={`py-2 border-b border-warmWood/20 ${location.pathname === '/process' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>訂購流程</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/list'); }} className={`py-2 border-b border-warmWood/20 ${['/list', '/order', '/success'].includes(location.pathname) ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>商品訂購</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/inquiry'); }} className={`py-2 border-b border-warmWood/20 ${location.pathname === '/inquiry' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>訂單查詢</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/contact'); }} className={`py-2 ${location.pathname === '/contact' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>聯絡我們</a>
             </div>
         )}
       </nav>
@@ -178,17 +209,31 @@ function App() {
       )}
 
       {/* 🚀 頁面路由器 */}
-      {currentPage === 'brand' && <BrandStory navigateTo={handleNavigate} />}
-      {currentPage === 'process' && <OrderProcess navigateTo={handleNavigate} />}
-      {currentPage === 'contact' && <ContactUs />}
-      {currentPage === 'list' && <ProductList cart={cart} updateCart={updateCart} handleQuantityChange={handleQuantityChange} navigateTo={handleNavigate} />}
-      {currentPage === 'order' && <Checkout cart={cart} updateCart={updateCart} handleQuantityChange={handleQuantityChange} navigateTo={handleNavigate} onOrderSuccess={handleOrderSuccess} setAlertMsg={setAlertMsg} />}
-      {currentPage === 'success' && <OrderSuccess submittedOrder={submittedOrder} navigateTo={handleNavigate} />}
-      {currentPage === 'inquiry' && <OrderInquiry key={resetKey} setAlertMsg={setAlertMsg} />}
+      <div className="pt-24 pb-10 min-h-[85vh]">
+        <Routes>
+          <Route path="/" element={<BrandStory navigateTo={handleNavigate} />} />
+          <Route path="/process" element={<OrderProcess navigateTo={handleNavigate} />} />
+          <Route path="/contact" element={<ContactUs />} />
+          <Route path="/list" element={<ProductList cart={cart} updateCart={updateCart} handleQuantityChange={handleQuantityChange} navigateTo={handleNavigate} />} />
+          <Route path="/order" element={<Checkout cart={cart} updateCart={updateCart} handleQuantityChange={handleQuantityChange} navigateTo={handleNavigate} onOrderSuccess={handleOrderSuccess} setAlertMsg={setAlertMsg} />} />
+          <Route path="/success" element={<OrderSuccess submittedOrder={submittedOrder} navigateTo={handleNavigate} />} />
+          <Route path="/inquiry" element={<OrderInquiry setAlertMsg={setAlertMsg} />} />
+          <Route path="*" element={<BrandStory navigateTo={handleNavigate} />} />
+        </Routes>
+      </div>
 
       <Footer />
     </div>
   );
 }
 
-export default App;
+// --------------------------------------------------------
+// 🚀 導出 App：在此處包覆 BrowserRouter 並設定 basename
+// --------------------------------------------------------
+export default function App() {
+  return (
+    <BrowserRouter basename="/leebobo-frontend">
+      <AppContent />
+    </BrowserRouter>
+  );
+}

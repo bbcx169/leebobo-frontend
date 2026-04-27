@@ -96,7 +96,6 @@ const Checkout = ({
   const cityMap = { taipei: '臺北市', new_taipei: '新北市', pickup: '自取' };
   const currentCityName = cityMap[formData.deliveryCity] || '請選擇縣市';
 
-  // 💡 顧問優化：統一處理「未提供」顯示的工具函數
   const renderDetailRow = (label, value) => (
     <React.Fragment>
       <span className="text-darkWood/60 font-medium">{label}</span>
@@ -139,6 +138,14 @@ const Checkout = ({
       if (!phoneRegex.test(formData.recipientPhone)) {
         setAlertMsg("收貨人聯絡電話格式錯誤，請輸入完整的 10 位數字。"); return;
       }
+
+      // 💡 新增：驗證電子信箱格式
+      if (formData.ordererEmail) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.ordererEmail)) {
+          setAlertMsg("電子信箱格式錯誤，請輸入有效的 Email。"); return;
+        }
+      }
     }
     setCurrentStep(prev => prev + 1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -155,7 +162,6 @@ const Checkout = ({
     const fullAddress = isLocked ? '需配合商家時間地點自取' : `${currentCityName}${detailAddress}`;
     const locationText = formData.eventType === 'wedding' ? formData.weddingLocation : formData.generalLocation;
     
-    // 💡 顧問優化：送出給後端的資料也同步自取的顯示文字
     const finalEventTime = isLocked ? '需配合商家時間地點自取' : (formData.weddingTime || formData.generalTime || '未提供');
     const specificDetails = isLocked ? `取貨地址：${fullAddress}` : `地點：${locationText || '未提供'}\n地址：${fullAddress}`;
 
@@ -176,7 +182,6 @@ const Checkout = ({
     };
 
     try {
-      // 💡 顧問修正：補上備用的 GAS 網址，防止 .env 讀不到時發生錯誤
       const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzf8kJ6Ka8yGabg--MCRJ8eyucBbsGRDbceGEeH-CQDLqOMXhTCysZVrPKL0MLpSg4L/exec';
       const response = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
       const result = await response.json();
@@ -296,8 +301,11 @@ const Checkout = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input type="text" name="ordererName" required placeholder="姓名 *" value={formData.ordererName} onChange={handleFormChange} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite outline-none" />
                     <input type="tel" name="ordererPhone" required maxLength="10" inputMode="numeric" placeholder="聯絡手機(10位數字)*" value={formData.ordererPhone} onChange={handleFormChange} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite outline-none" />
+                    
+                    {/* 💡 包含溫馨提示與紅框驗證焦點的信箱輸入區塊 */}
                     <div className="md:col-span-2">
-                      <input type="email" name="ordererEmail" placeholder="電子信箱" value={formData.ordererEmail} onChange={handleFormChange} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite outline-none" />
+                      <input type="email" name="ordererEmail" placeholder="電子信箱" value={formData.ordererEmail} onChange={handleFormChange} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite outline-none focus:ring-2 focus:ring-amberRed transition-all" />
+                      <p className="text-xs text-darkWood/60 mt-2 font-medium pl-1">💡 填寫可收取系統自動發送的訂單明細 (PDF)</p>
                     </div>
                   </div>
                 </div>
@@ -328,7 +336,6 @@ const Checkout = ({
                       {renderDetailRow('活動類型', formData.eventType === 'wedding' ? '浪漫婚禮 / 喜宴' : formData.eventType === 'school' ? '校園活動 / 園遊會' : '其他')}
                       {renderDetailRow('活動日期', formData.weddingDate || formData.generalDate)}
                       
-                      {/* 💡 顧問優化：自取模式下自動顯示固定文字 */}
                       {isLocked ? (
                         <>
                           {renderDetailRow('取貨時間', '需配合商家時間地點自取')}
@@ -348,10 +355,9 @@ const Checkout = ({
                   <div className="space-y-3 pt-2">
                     <h3 className="text-base font-bold text-amberRed border-b border-warmWood/20 pb-2">聯絡資訊</h3>
                     <div className="grid grid-cols-[80px_1fr] gap-y-2">
-                      {/* 💡 顧問優化：合併顯示 姓名(聯絡手機號碼) */}
-                      {renderDetailRow('訂購人', `${formData.ordererName || '未提供'}(${formData.ordererPhone || '未提供'})`)}
+                      {renderDetailRow('訂購人', `${formData.ordererName || '未提供'} (${formData.ordererPhone || '未提供'})`)}
                       {renderDetailRow('電子信箱', formData.ordererEmail)}
-                      {renderDetailRow(isLocked ? '取貨人' : '收貨人', `${formData.recipientName || '未提供'}(${formData.recipientPhone || '未提供'})`)}
+                      {renderDetailRow(isLocked ? '取貨人' : '收貨人', `${formData.recipientName || '未提供'} (${formData.recipientPhone || '未提供'})`)}
                       {renderDetailRow('備註', formData.notes)}
                     </div>
                   </div>
