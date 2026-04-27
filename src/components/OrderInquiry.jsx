@@ -1,201 +1,267 @@
-// src/components/OrderInquiry.jsx
 import React, { useState } from 'react';
-import { useScrollFadeIn } from '../hooks/useScrollFadeIn';
-import { SCRIPT_URL } from '../constants';
+import { products } from '../constants/data';
+import useScrollFadeIn from '../hooks/useScrollFadeIn';
+import OrderReceipt from '../components/OrderReceipt';
 
-const OrderInquiry = () => {
+// 讀取環境變數 API
+const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL;
+
+const OrderInquiry = ({ setAlertMsg }) => {
+  // 載入與訂購流程一致的滾動淡入動畫邏輯
   useScrollFadeIn();
-  
-  // === 狀態管理 ===
-  const [query, setQuery] = useState({ name: '', phone: '', date: '' });
-  const [isLoading, setIsLoading] = useState(false);
-  const [results, setResults] = useState(null); // 搜尋結果列表
-  const [selectedOrder, setSelectedOrder] = useState(null); // 目前選中的單筆訂單
-  const [statusMsg, setStatusMsg] = useState({ show: false, text: '', type: '' });
 
-  // 輔助函數：顯示提示訊息
-  const showStatus = (text, type = 'info') => {
-    setStatusMsg({ show: true, text, type });
-    if (type !== 'loading') {
-      setTimeout(() => setStatusMsg({ show: false, text: '', type: '' }), 3000);
-    }
-  };
+  // 查詢相關狀態
+  const [inqName, setInqName] = useState('');
+  const [inqPhone, setInqPhone] = useState('');
+  const [inqDate, setInqDate] = useState('');
+  const [inqStatus, setInqStatus] = useState('idle'); 
+  const [inqData, setInqData] = useState(null); 
+  const [inqMatches, setInqMatches] = useState([]);
+  const [showEmailPrompt, setShowEmailPrompt] = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
+  const [isResending, setIsResending] = useState(false);
+  const [isPdfDownloaded, setIsPdfDownloaded] = useState(false);
 
-  // 處理查詢
-  const handleSearch = async (e) => {
+  // --- 查詢 API 邏輯 ---
+  const handleInquirySubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    setResults(null);
-    setSelectedOrder(null);
-    showStatus('查詢中，請稍候...', 'loading');
+    setIsPdfDownloaded(false);
 
+    // 🚀 嚴格前端驗證：確保手機格式為 10 位數字，且為 09 開頭
+    const phoneRegex = /^09\d{8}$/;
+    if (!phoneRegex.test(inqPhone)) {
+        setAlertMsg(["⚠️ 手機號碼格式錯誤", "請輸入 10 位數字的手機號碼 (例如: 0912345678)！"]);
+        return;
+    }
+
+    if (!inqName || !inqPhone || !inqDate) { 
+        setAlertMsg("請完整填寫所有查詢欄位！"); 
+        return; 
+    }
+    
+    setInqStatus('loading');
     try {
-      const params = new URLSearchParams({
-        action: 'queryOrder',
-        name: query.name,
-        phone: query.phone,
-        date: query.date
-      });
-
-      const response = await fetch(`${SCRIPT_URL}?${params.toString()}`);
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        if (data.data.length === 0) {
-          showStatus('找不到符合的訂單，請確認資料是否正確。', 'error');
-        } else if (data.data.length === 1) {
-          // 只有一筆，直接顯示細節
-          setSelectedOrder(data.data[0]);
-          setResults(null);
-          setStatusMsg({ show: false, text: '', type: '' });
-        } else {
-          // 有多筆，顯示列表供選擇
-          setResults(data.data);
-          setStatusMsg({ show: false, text: '', type: '' });
+        const url = `${SCRIPT_URL}?action=query_order&name=${encodeURIComponent(inqName)}&phone=${encodeURIComponent(inqPhone)}&date=${encodeURIComponent(inqDate)}`;
+        const res = await fetch(url);
+        const resData = await res.json();
+        
+        if (resData.status === 'success') {
+            if (resData.data.length > 1) {
+                setInqMatches(resData.data); 
+                setInqStatus('multiple_matches');
+            } else if (resData.data.length === 1) {
+                setInqMatches(resData.data); 
+                setInqData(resData.data[0]); 
+                setResendEmail(resData.data[0].ordererEmail || ''); 
+                setInqStatus('success');
+            } else { 
+                setInqStatus('not_found'); 
+            }
+        } else { 
+            setInqStatus('not_found'); 
         }
-      } else {
-        showStatus('查詢失敗：' + data.message, 'error');
-      }
-    } catch (error) {
-      showStatus('連線發生錯誤，請稍後再試。', 'error');
-    } finally {
-      setIsLoading(false);
+    } catch (err) { 
+        console.error(err); 
+        setInqStatus('error');
+        setAlertMsg(["⚠️ 查詢連線失敗", "請檢查您的網路連線，或稍後再重試。"]);
     }
   };
 
-  // 處理補發郵件請求
-  const handleResendEmail = async (orderNumber) => {
-    showStatus('補發郵件中...', 'loading');
-    try {
-      const params = new URLSearchParams({ action: 'resendEmail', orderNumber });
-      const response = await fetch(`${SCRIPT_URL}?${params.toString()}`);
-      const data = await response.json();
-      if (data.status === 'success') showStatus('郵件已重新發送！', 'success');
-      else showStatus('發送失敗，請聯繫客服。', 'error');
-    } catch (e) {
-      showStatus('發送發生錯誤。', 'error');
+  const handleDownloadPDF = (url) => {
+    if (url) { 
+        window.open(url, '_blank'); 
+        setIsPdfDownloaded(true); 
+    } else { 
+        setAlertMsg("⚠️ 尚未取得 PDF 下載連結，請稍後再試或聯繫客服。"); 
     }
+  };
+
+  const handleResendEmail = async () => {
+      if (!resendEmail) { 
+          setAlertMsg("請輸入聯絡信箱！"); 
+          return; 
+      }
+      setIsResending(true);
+      try {
+          const response = await fetch(SCRIPT_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'resendPdf', orderNumber: inqData.orderNumber, email: resendEmail })
+          });
+          const result = await response.json();
+          if (result.status === 'success') {
+              setAlertMsg("✅ 訂單 PDF 明細已成功補發至您的信箱！"); 
+              setShowEmailPrompt(false);
+          } else { 
+              setAlertMsg(["補發失敗，請稍後再試。", `錯誤：${result.message}`]); 
+          }
+      } catch(err) { 
+          setAlertMsg(["補發失敗，請稍後再試。", `錯誤：${err.message}`]); 
+      } finally { 
+          setIsResending(false); 
+      }
+  };
+
+  const handleGoBack = () => {
+      setShowEmailPrompt(false);
+      setIsPdfDownloaded(false);
+      
+      if (inqMatches.length > 1) {
+          setInqStatus('multiple_matches');
+          setInqData(null);
+      } else {
+          setInqStatus('idle');
+          setInqName('');
+          setInqPhone('');
+          setInqDate('');
+          setInqMatches([]);
+          setInqData(null);
+      }
   };
 
   return (
-    <div className="pt-24 pb-24 min-h-screen fade-in-up">
-      <div className="max-w-4xl mx-auto px-6">
+    <div className="relative z-10 container mx-auto px-4 sm:px-6 pt-32 pb-12 lg:pb-20 max-w-5xl">
         
-        {/* 標題區 */}
-        <div className="text-center mb-10">
-          <h2 className="text-3xl md:text-4xl font-serif font-bold text-amberRed mb-4">訂單查詢</h2>
-          <p className="text-darkWood/70 font-sans">輸入訂購資訊，隨時掌握您的甜蜜進度。</p>
+        <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
+            <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-[#D2B48C] rounded-full mix-blend-multiply filter blur-[100px] opacity-30 animate-pulse"></div>
+            <div className="absolute inset-0 bg-wood-texture mix-blend-overlay opacity-40"></div>
         </div>
 
-        {/* 提示訊息 */}
-        {statusMsg.show && (
-          <div className={`fixed top-24 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-lg text-white font-bold transition-all ${
-            statusMsg.type === 'error' ? 'bg-red-500' : statusMsg.type === 'loading' ? 'bg-amberRed' : 'bg-green-600'
-          }`}>
-            {statusMsg.text}
-          </div>
-        )}
+        <header className="text-center mb-12 fade-in-up">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-amberRed mb-4 tracking-widest font-serif drop-shadow-sm">訂單查詢</h1>
+            <div className="mx-auto w-24 h-1.5 bg-warmWood rounded-full shadow-sm mb-6"></div>
+            <p className="text-lg md:text-xl text-darkWood tracking-[0.15em] font-medium opacity-90">隨時掌握您的甜蜜預約進度</p>
+        </header>
 
-        {/* 視圖一：搜尋表單 (當沒有結果且沒選中訂單時顯示) */}
-        {!results && !selectedOrder && (
-          <form onSubmit={handleSearch} className="bg-pureWhite p-8 rounded-[2rem] shadow-xl border border-warmWood/20">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div>
-                <label className="block text-sm font-bold text-darkWood mb-2">訂購人姓名</label>
-                <input type="text" required value={query.name} onChange={e => setQuery({...query, name: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-amberRed outline-none" placeholder="李大明" />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-darkWood mb-2">手機號碼</label>
-                <input type="tel" required value={query.phone} onChange={e => setQuery({...query, phone: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-amberRed outline-none" placeholder="0912345678" />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-darkWood mb-2">活動日期</label>
-                <input type="date" required value={query.date} onChange={e => setQuery({...query, date: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-amberRed outline-none" />
-              </div>
+        {inqStatus === 'multiple_matches' ? (
+            <div className="bg-pureWhite/95 border border-pureWhite shadow-xl rounded-2xl p-6 md:p-10 mx-auto max-w-2xl relative overflow-hidden animate-[fadeIn_0.5s_ease-out]">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-warmWood to-amberRed"></div>
+                <h3 className="text-2xl font-bold text-darkWood mb-4 font-serif text-center">找到多筆符合的訂單</h3>
+                <p className="text-darkWood/80 font-medium mb-8 text-center">您在同一天有多筆預約，請選擇您要查看的明細：</p>
+                
+                <div className="space-y-4">
+                    {inqMatches.map((order, idx) => (
+                        <div key={idx} onClick={() => { 
+                            setInqData(order); 
+                            setResendEmail(order.ordererEmail || ''); 
+                            setInqStatus('success'); 
+                            setIsPdfDownloaded(false); 
+                        }} className="bg-pureWhite/80 hover:bg-white border border-warmWood/30 hover:border-amberRed cursor-pointer p-5 rounded-xl shadow-sm hover:shadow-md transition-all flex justify-between items-center group">
+                            <div>
+                                <p className="font-bold text-darkWood mb-1 text-lg">訂購時間：{order.orderDate} {order.orderTime}</p>
+                                <p className="text-sm text-darkWood/70">總金額：NT$ {order.totalPrice.toLocaleString()}</p>
+                            </div>
+                            <div className="text-amberRed transform group-hover:translate-x-2 transition-transform">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                
+                <div className="mt-8 text-center border-t border-warmWood/20 pt-6">
+                    <button onClick={() => { setInqStatus('idle'); setInqName(''); setInqPhone(''); setInqDate(''); setInqMatches([]); }} className="text-warmWood font-bold hover:text-darkWood transition-colors">
+                        ← 返回重新查詢
+                    </button>
+                </div>
             </div>
-            <button type="submit" disabled={isLoading} className="w-full py-4 bg-amberRed text-white rounded-xl font-bold text-lg hover:bg-darkWood transition-all shadow-md">
-              {isLoading ? '查詢中...' : '立即查詢訂單'}
-            </button>
-          </form>
-        )}
+        ) : (inqStatus === 'idle' || inqStatus === 'loading' || inqStatus === 'error' || inqStatus === 'not_found') ? (
+            <div className="bg-pureWhite/95 border border-pureWhite shadow-xl rounded-2xl p-6 md:p-10 mx-auto max-w-xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-warmWood to-amberRed"></div>
+                <p className="text-darkWood/80 font-medium mb-8 text-center">請輸入以下三項資訊進行身分驗證，以確保您的個資安全。</p>
+                
+                <form onSubmit={handleInquirySubmit} className="space-y-6">
+                    <div>
+                        <label className="block text-sm font-bold text-darkWood mb-1">訂購人姓名</label>
+                        <input type="text" required value={inqName} onChange={e=>setInqName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite focus:outline-none focus:ring-2 focus:ring-amberRed transition-colors" placeholder="例：王大明" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-darkWood mb-1">訂購人手機號碼</label>
+                        {/* 🚀 嚴格限制：新增 minLength 並強化 pattern */}
+                        <input 
+                            type="tel" 
+                            required 
+                            pattern="09[0-9]{8}" 
+                            maxLength="10" 
+                            minLength="10"
+                            title="請輸入 10 位數字的手機號碼 (需為 09 開頭)"
+                            value={inqPhone} 
+                            onChange={e=> {
+                                // 確保只能輸入數字
+                                const val = e.target.value.replace(/\D/g, '');
+                                setInqPhone(val);
+                            }} 
+                            className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite focus:outline-none focus:ring-2 focus:ring-amberRed transition-colors" 
+                            placeholder="例：0912345678" 
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-darkWood mb-1">活動日期 <span className="text-xs text-amberRed font-bold ml-1 tracking-wider">(請選西元年)</span></label>
+                        <input type="date" required value={inqDate} onChange={e=>setInqDate(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite focus:outline-none focus:ring-2 focus:ring-amberRed transition-colors" />
+                    </div>
+                    <button type="submit" disabled={inqStatus === 'loading'} className="w-full bg-amberRed hover:bg-darkWood disabled:bg-warmWood/50 text-white font-bold text-lg py-4 rounded-xl shadow-md transition-all mt-4">
+                        {inqStatus === 'loading' ? '安全驗證與查詢中...' : '送出查詢'}
+                    </button>
+                </form>
 
-        {/* 視圖二：多筆結果列表 */}
-        {results && (
-          <div className="bg-pureWhite p-8 rounded-[2rem] shadow-xl border border-warmWood/20">
-            <h3 className="text-xl font-bold mb-6 text-darkWood">找到多筆訂單，請選擇：</h3>
-            <div className="space-y-4">
-              {results.map((order, idx) => (
-                <div key={idx} onClick={() => { setSelectedOrder(order); setResults(null); }} className="p-4 border border-warmWood/20 rounded-xl hover:bg-creamBg cursor-pointer transition-all flex justify-between items-center group">
-                  <div>
-                    <div className="font-bold text-amberRed">#{order.orderNumber}</div>
-                    <div className="text-sm text-darkWood/60">{order.timestamp}</div>
-                  </div>
-                  <div className="text-amberRed group-hover:translate-x-1 transition-transform">→</div>
-                </div>
-              ))}
+                {inqStatus === 'not_found' && (
+                    <div className="mt-8 bg-red-50 border border-red-200 text-amberRed p-5 rounded-xl text-sm leading-relaxed">
+                        <strong>⚠️ 找不到符合的訂單。</strong><br/><br/>請確認您的資料是否正確？
+                        <a href="https://lin.ee/5QYll8k" target="_blank" rel="noopener noreferrer" className="mt-3 block text-center bg-[#06C755] text-white py-2 rounded-lg font-bold w-full hover:bg-[#05b34c] transition-colors">聯繫 LINE 客服協助</a>
+                    </div>
+                )}
             </div>
-            <button onClick={() => setResults(null)} className="mt-8 text-warmWood font-bold hover:text-amberRed">← 返回重新搜尋</button>
-          </div>
-        )}
+        ) : (
+            <div className="bg-pureWhite/95 border border-pureWhite shadow-xl rounded-3xl p-6 md:p-12 text-center animate-[fadeIn_0.5s_ease-out]">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+                <h2 className="text-3xl font-bold mb-4 font-serif text-darkWood">查詢成功！</h2>
+                <p className="text-darkWood/70 mb-8">以下為您的訂單明細紀錄。</p>
 
-        {/* 視圖三：單筆訂單詳細內容 */}
-        {selectedOrder && (
-          <div className="bg-pureWhite overflow-hidden rounded-[2rem] shadow-2xl border border-warmWood/20 animate-[fadeIn_0.5s_ease-out]">
-            {/* 訂單頭部 */}
-            <div className="bg-amberRed p-8 text-white">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <p className="text-amber-200 text-sm tracking-widest uppercase font-bold mb-1">Order Details</p>
-                  <h3 className="text-3xl font-serif font-bold">#{selectedOrder.orderNumber}</h3>
+                <div className="mb-8 text-left">
+                    <OrderReceipt 
+                        order={{
+                            orderNumber: inqData.orderNumber,
+                            payload: inqData, 
+                            cart: inqData.cart, 
+                            candyQty: Object.entries(inqData.cart).reduce((s, [id, q]) => parseInt(id) !== 5 ? s + q : s, 0),
+                            broomQty: inqData.cart['5'] || 0, 
+                            candySubtotal: inqData.candySubtotal, 
+                            broomRent: inqData.broomRent,
+                            broomDeposit: inqData.broomDeposit, 
+                            shippingFee: inqData.shippingFee, 
+                            totalPrice: inqData.totalPrice
+                        }} 
+                        products={products}
+                    />
                 </div>
-                <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg text-sm">
-                  {selectedOrder.status || '已收單'}
+
+                <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
+                    <button onClick={() => handleDownloadPDF(inqData.pdfDownloadUrl)} className={`inline-flex items-center justify-center gap-2 text-white py-3.5 px-8 rounded-xl font-bold shadow-md transition-all w-full sm:w-auto ${isPdfDownloaded ? 'bg-[#06C755] hover:bg-[#05b34c]' : 'bg-darkWood hover:bg-[#2A1A17]'}`}>
+                        {isPdfDownloaded ? "✅ 下載完成" : "📄 下載訂單明細 (PDF)"}
+                    </button>
+                    <button onClick={() => setShowEmailPrompt(!showEmailPrompt)} className="inline-flex items-center justify-center gap-2 bg-amberRed hover:bg-[#802020] text-white py-3.5 px-8 rounded-xl font-bold shadow-md transition-all w-full sm:w-auto">
+                        📧 傳送 PDF (Email)
+                    </button>
                 </div>
-              </div>
-              <p className="text-white/80 text-sm">成立時間：{selectedOrder.timestamp}</p>
+
+                {showEmailPrompt && (
+                    <div className="bg-creamBg border border-warmWood/30 p-6 rounded-2xl max-w-md mx-auto mb-8 animate-[fadeIn_0.3s_ease-out]">
+                        <h4 className="font-bold text-darkWood mb-3">請輸入欲接收明細的信箱：</h4>
+                        <input type="email" value={resendEmail} onChange={e=>setResendEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 mb-4 focus:ring-2 focus:ring-amberRed outline-none" placeholder="example@gmail.com" />
+                        <button onClick={handleResendEmail} disabled={isResending} className="w-full bg-[#06C755] text-white font-bold py-3 rounded-xl hover:bg-[#05b34c] disabled:opacity-50">
+                            {isResending ? "傳送中..." : "確認傳送"}
+                        </button>
+                    </div>
+                )}
+
+                <div className="mt-8 border-t border-warmWood/20 pt-6">
+                   <button onClick={handleGoBack} className="text-amberRed font-bold hover:text-darkWood transition-colors">
+                      {inqMatches.length > 1 ? '← 返回訂單列表' : '← 查詢其他訂單'}
+                   </button>
+                </div>
             </div>
-
-            {/* 內容詳情 */}
-            <div className="p-8 space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <h4 className="font-bold text-darkWood border-l-4 border-warmWood pl-3 mb-4">基本資訊</h4>
-                  <ul className="space-y-2 text-sm text-darkWood/80">
-                    <li><span className="font-bold">訂購人：</span>{selectedOrder.ordererName}</li>
-                    <li><span className="font-bold">活動類型：</span>{selectedOrder.eventType}</li>
-                    <li><span className="font-bold">日期時間：</span>{selectedOrder.eventDate} {selectedOrder.eventTime}</li>
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="font-bold text-darkWood border-l-4 border-warmWood pl-3 mb-4">配送地點</h4>
-                  <p className="text-sm text-darkWood/80 leading-relaxed">{selectedOrder.locationName}<br/>{selectedOrder.address}</p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-darkWood border-l-4 border-warmWood pl-3 mb-4">訂購明細</h4>
-                <div className="bg-creamBg/50 rounded-xl p-4 text-sm text-darkWood/80 whitespace-pre-line leading-loose">
-                  {selectedOrder.details}
-                </div>
-              </div>
-
-              {/* 操作按鈕 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                <a href={selectedOrder.pdfUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-4 bg-darkWood text-white rounded-xl font-bold hover:bg-black transition-all">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                  下載 PDF 明細
-                </a>
-                <button onClick={() => handleResendEmail(selectedOrder.orderNumber)} className="flex items-center justify-center gap-2 py-4 border-2 border-warmWood text-warmWood rounded-xl font-bold hover:bg-warmWood hover:text-white transition-all">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                  重新發送 Email
-                </button>
-              </div>
-
-              <button onClick={() => setSelectedOrder(null)} className="w-full text-center text-darkWood/40 text-sm hover:text-amberRed transition-colors">← 返回搜尋其他訂單</button>
-            </div>
-          </div>
         )}
-      </div>
     </div>
   );
 };

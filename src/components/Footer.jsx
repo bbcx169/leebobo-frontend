@@ -1,5 +1,6 @@
 // src/components/Footer.jsx
 import React from 'react';
+import { Link } from 'react-router-dom'; // 👈 引入 Link 元件以實現內部路由跳轉
 
 // 👇 1. 從 assets/images/Footer 資料夾匯入圖片
 import lineIcon from '../assets/images/Footer/line.png';
@@ -36,7 +37,6 @@ const Footer = () => {
         {/* 右側：社群媒體與相關連結圖示 */}
         <div className="lg:col-span-7 flex flex-wrap justify-center lg:justify-end items-center gap-6 lg:gap-10">
           <a href="https://line.me/R/ti/p/@687vjdlz?oat_content=url&ts=04100108" target="_blank" rel="noopener noreferrer" className="block hover:scale-105 transition-transform duration-300">
-            {/* 👇 2. 將 src 替換為變數 */}
             <img src={lineIcon} alt="LINE 官方帳號" className="w-20 h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 object-contain rounded-xl drop-shadow-md" loading="lazy" />
           </a>
           <a href="https://www.facebook.com/ningxia.tanghulu" target="_blank" rel="noopener noreferrer" className="block hover:scale-105 transition-transform duration-300">
@@ -45,9 +45,11 @@ const Footer = () => {
           <a href="https://www.facebook.com/profile.php?id=100057620284780" target="_blank" rel="noopener noreferrer" className="block hover:scale-105 transition-transform duration-300">
             <img src={nmIcon} alt="寧夏夜市" className="w-20 h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 object-contain" loading="lazy" />
           </a>
-          <a href="https://bbcx169.github.io/leebobo-admin/" target="_blank" rel="noopener noreferrer" className="block hover:scale-105 transition-transform duration-300">
+          
+          {/* 🚀 【精確修改區塊】僅將 <a> 替換為 <Link to="/admin">，其他完全不變 */}
+          <Link to="/admin" className="block hover:scale-105 transition-transform duration-300">
             <img src={logoIcon} alt="冰糖璃" className="h-20 md:h-24 lg:h-28 w-auto object-contain drop-shadow-md" loading="lazy" />
-          </a>
+          </Link>
         </div>
       </div>
 
