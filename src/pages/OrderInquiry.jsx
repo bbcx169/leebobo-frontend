@@ -3,8 +3,8 @@ import { products } from '../constants/data';
 import useScrollFadeIn from '../hooks/useScrollFadeIn';
 import OrderReceipt from '../components/OrderReceipt';
 
-// 讀取環境變數 API
-const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL;
+// 💡 讀取環境變數 API，並加上備用網址（雙保險防連線失敗）
+const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzf8kJ6Ka8yGabg--MCRJ8eyucBbsGRDbceGEeH-CQDLqOMXhTCysZVrPKL0MLpSg4L/exec';
 
 const OrderInquiry = ({ setAlertMsg }) => {
   // 載入與訂購流程一致的滾動淡入動畫邏輯
@@ -30,9 +30,16 @@ const OrderInquiry = ({ setAlertMsg }) => {
         setAlertMsg("請完整填寫所有查詢欄位！"); 
         return; 
     }
+
+    // 💡 第三道防線：送出前嚴格檢查是否剛好 10 位數
+    if (inqPhone.length !== 10) {
+        setAlertMsg("手機號碼格式錯誤，請輸入完整的 10 位數字！");
+        return;
+    }
     
     setInqStatus('loading');
     try {
+        // 💡 透過 GET 請求執行 query_order
         const url = `${SCRIPT_URL}?action=query_order&name=${encodeURIComponent(inqName)}&phone=${encodeURIComponent(inqPhone)}&date=${encodeURIComponent(inqDate)}`;
         const res = await fetch(url);
         const resData = await res.json();
@@ -42,7 +49,7 @@ const OrderInquiry = ({ setAlertMsg }) => {
                 setInqMatches(resData.data); 
                 setInqStatus('multiple_matches');
             } else if (resData.data.length === 1) {
-                setInqMatches(resData.data); // 💡 確保單筆查詢也存入 Matches，方便後續邏輯判斷
+                setInqMatches(resData.data); 
                 setInqData(resData.data[0]); 
                 setResendEmail(resData.data[0].ordererEmail || ''); 
                 setInqStatus('success');
@@ -68,6 +75,7 @@ const OrderInquiry = ({ setAlertMsg }) => {
     }
   };
 
+  // 💡 處理補寄 Email 的 API 請求
   const handleResendEmail = async () => {
       if (!resendEmail) { 
           setAlertMsg("請輸入聯絡信箱！"); 
@@ -78,7 +86,12 @@ const OrderInquiry = ({ setAlertMsg }) => {
           const response = await fetch(SCRIPT_URL, {
               method: 'POST',
               headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ action: 'resend_email', orderNumber: inqData.orderNumber, email: resendEmail })
+              // 💡 這裡將 action 修改為後端統一的 'resendPdf'，解決 Unknown action 錯誤
+              body: JSON.stringify({ 
+                  action: 'resendPdf', 
+                  orderNumber: inqData.orderNumber, 
+                  email: resendEmail 
+              })
           });
           const result = await response.json();
           if (result.status === 'success') {
@@ -94,7 +107,7 @@ const OrderInquiry = ({ setAlertMsg }) => {
       }
   };
 
-  // 💡 新增：智慧返回邏輯，處理「多筆訂單」與「重新查詢」的情境
+  // 💡 智慧返回邏輯，處理「多筆訂單」與「重新查詢」的情境
   const handleGoBack = () => {
       setShowEmailPrompt(false);
       setIsPdfDownloaded(false);
@@ -171,7 +184,16 @@ const OrderInquiry = ({ setAlertMsg }) => {
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-darkWood mb-1">訂購人手機號碼</label>
-                        <input type="tel" required value={inqPhone} onChange={e=>setInqPhone(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite focus:outline-none focus:ring-2 focus:ring-amberRed transition-colors" placeholder="例：0912345678" />
+                        {/* 💡 第一道與第二道防線：過濾非數字字元，並且限制最大長度為 10 */}
+                        <input 
+                            type="tel" 
+                            required 
+                            maxLength={10} 
+                            value={inqPhone} 
+                            onChange={e => setInqPhone(e.target.value.replace(/\D/g, ''))} 
+                            className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite focus:outline-none focus:ring-2 focus:ring-amberRed transition-colors" 
+                            placeholder="例：0912345678" 
+                        />
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-darkWood mb-1">活動日期 <span className="text-xs text-amberRed font-bold ml-1 tracking-wider">(請選西元年)</span></label>
@@ -235,7 +257,6 @@ const OrderInquiry = ({ setAlertMsg }) => {
                 )}
 
                 <div className="mt-8 border-t border-warmWood/20 pt-6">
-                   {/* 💡 套用新的 handleGoBack 智慧返回邏輯 */}
                    <button onClick={handleGoBack} className="text-amberRed font-bold hover:text-darkWood transition-colors">
                       {inqMatches.length > 1 ? '← 返回訂單列表' : '← 查詢其他訂單'}
                    </button>

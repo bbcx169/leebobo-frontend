@@ -56,7 +56,7 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
-          action: 'resend_email',
+          action: 'resendPdf',
           orderNumber: submittedOrder.orderNumber,
           email: emailAddress
         })

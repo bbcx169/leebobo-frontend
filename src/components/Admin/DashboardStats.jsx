@@ -183,9 +183,9 @@ export default function DashboardStats({
                           )}
                         </div>
                         
-                        {/* 🚀 修正：點擊訂單編號開啟 PDF */}
-                        {order.pdfDownloadUrl ? (
-                          <a href={order.pdfDownloadUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-amberRed hover:text-red-800 hover:underline flex items-center gap-1.5 bg-red-50 px-3 py-2 rounded-lg border border-red-100 shadow-sm transition-colors" title="點擊開啟 PDF">
+                        {/* 🚀 顧問修正：相容 pdfUrl 與 pdfDownloadUrl，點擊訂單編號開啟 PDF */}
+                        {(order.pdfUrl || order.pdfDownloadUrl) ? (
+                          <a href={order.pdfUrl || order.pdfDownloadUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-amberRed hover:text-red-800 hover:underline flex items-center gap-1.5 bg-red-50 px-3 py-2 rounded-lg border border-red-100 shadow-sm transition-colors" title="點擊開啟 PDF">
                             #{order.orderNumber}
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
                           </a>
