@@ -37,7 +37,7 @@ export default function AdminModals({
         </div>
       )}
 
-      {/* 2. 修改交貨時間與地點 Modal */}
+      {/* 2. 修改交貨時間、地點與備註 Modal */}
       {editModal?.isOpen && (
         <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl border border-gray-100 animate-[fadeIn_0.2s_ease-out]">
@@ -69,22 +69,34 @@ export default function AdminModals({
                 </div>
               </div>
 
-              {/* 🚀 新增：修改地點/地址欄位 */}
+              {/* 🚀 修改地點/地址欄位 */}
               <div>
                 <label className="block text-xs font-bold text-gray-400 mb-1">修改地點與詳細資訊</label>
                 <textarea 
                   value={editModal.location} 
                   onChange={e => setEditModal({...editModal, location: e.target.value})} 
                   placeholder="請輸入新的地址或地點資訊..."
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm min-h-[100px] resize-none"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm min-h-[80px] resize-none"
                 />
                 <p className="text-[10px] text-gray-400 mt-1">💡 提示：此欄位內容將會直接更新至 PDF 的「配送地址」區塊。</p>
+              </div>
+
+              {/* 🚀 新增：修改備註欄位 */}
+              <div>
+                <label className="block text-xs font-bold text-gray-400 mb-1">修改備註</label>
+                <textarea 
+                  value={editModal.notes || ''} 
+                  onChange={e => setEditModal({...editModal, notes: e.target.value})} 
+                  placeholder="請輸入訂單備註 (若無則留白)..."
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm min-h-[60px] resize-none"
+                />
+                <p className="text-[10px] text-gray-400 mt-1">💡 提示：此欄位內容將會直接更新至 PDF 的「備註」區塊。</p>
               </div>
             </div>
             
             <div className="flex gap-3">
               <button 
-                onClick={() => setEditModal({ isOpen: false, order: null, eventDate: '', eventTime: '', location: '' })} 
+                onClick={() => setEditModal({ isOpen: false, order: null, eventDate: '', eventTime: '', location: '', notes: '' })} 
                 className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors"
               >
                 取消

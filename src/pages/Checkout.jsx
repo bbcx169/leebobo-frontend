@@ -362,13 +362,46 @@ const Checkout = ({
                     </div>
                   </div>
 
-                  {/* 購買項目 */}
-                  <div className="bg-creamBg/50 p-4 rounded-xl border border-warmWood/20">
-                    <h3 className="text-base font-bold text-darkWood border-b border-warmWood/20 pb-2">預估總金額</h3>
-                    <div className="pt-3 flex justify-end">
-                      <span className="text-2xl font-bold text-amberRed">NT$ {totalPrice.toLocaleString()}</span>
+                  {/* 🚀 補回購買項目區塊 */}
+                  <div className="bg-creamBg/50 p-5 rounded-xl border border-warmWood/20">
+                    <h3 className="text-base font-bold text-darkWood border-b border-warmWood/20 pb-2 mb-3">購買明細</h3>
+                    <div className="space-y-3 mb-4">
+                      {Object.entries(cart).map(([id, qty]) => {
+                        if (parseInt(id) === 5 || qty === 0) return null;
+                        const product = products.find(p => p.id === parseInt(id));
+                        return (
+                          <div key={id} className="flex justify-between items-center">
+                            <span className="text-darkWood font-medium">{product?.name} <span className="text-darkWood/50 ml-1 text-xs">x {qty}</span></span>
+                            <span className="text-darkWood font-bold">NT$ {(product?.price * qty).toLocaleString()}</span>
+                          </div>
+                        );
+                      })}
+                      
+                      {broomQty > 0 && (
+                        <>
+                          <div className="flex justify-between items-center">
+                            <span className="text-darkWood font-medium">承租掃帚 (租金) <span className="text-darkWood/50 ml-1 text-xs">x {broomQty}</span></span>
+                            <span className="text-darkWood font-bold">NT$ {broomRent.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-emerald-600 font-medium">掃帚押金 (歸還後退回)</span>
+                            <span className="text-emerald-600 font-bold">NT$ {broomDeposit.toLocaleString()}</span>
+                          </div>
+                        </>
+                      )}
+                      
+                      <div className="flex justify-between items-center">
+                        <span className="text-darkWood font-medium">配送運費 <span className="text-amberRed text-xs ml-1">{shippingHint}</span></span>
+                        <span className="text-darkWood font-bold">NT$ {shippingFee.toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-warmWood/20 flex justify-between items-end">
+                      <span className="text-sm font-bold text-darkWood">預估總金額</span>
+                      <span className="text-2xl font-black text-amberRed">NT$ {totalPrice.toLocaleString()}</span>
                     </div>
                   </div>
+
                 </div>
               </div>
             )}

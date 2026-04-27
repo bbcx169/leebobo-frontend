@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import liff from '@line/liff';
 
-// 🚀 引入您先前拆解出來的三個展示元件
+// 🚀 引入展示元件
 import DashboardStats from '../components/Admin/DashboardStats';
 import OrderTable from '../components/Admin/OrderTable';
 import AdminModals from '../components/Admin/AdminModals';
@@ -25,6 +25,9 @@ export default function AdminDashboard() {
   const [userProfile, setUserProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   
+  // 🚀 導覽列伸縮狀態 (預設關閉，僅顯示圖示)
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -38,12 +41,14 @@ export default function AdminDashboard() {
   const [resendModal, setResendModal] = useState({ isOpen: false, order: null, email: '' });
   const [isResending, setIsResending] = useState(false);
 
+  // 🚀 修改訂單狀態：擴充 notes 欄位
   const [editModal, setEditModal] = useState({ 
     isOpen: false, 
     order: null, 
     eventDate: '', 
     eventTime: '', 
-    location: '' 
+    location: '',
+    notes: '' 
   });
   const [isUpdating, setIsUpdating] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -117,7 +122,7 @@ export default function AdminDashboard() {
   const handleLogin = () => liff.login({ redirectUri: window.location.href });
   const handleLogout = () => { liff.logout(); window.location.reload(); };
 
-  // 🚀 地點與時間更新 API 串接
+  // 🚀 更新：處理包含「備註」的訂單更新請求
   const handleUpdateOrderTime = async () => {
     if (!editModal.eventDate || !editModal.eventTime) return alert("請填寫日期與時間");
     setIsUpdating(true);
@@ -127,10 +132,11 @@ export default function AdminDashboard() {
         orderNumber: editModal.order.orderNumber, 
         newDate: editModal.eventDate, 
         newTime: editModal.eventTime,
-        newDetails: editModal.location 
+        newDetails: editModal.location,
+        newNotes: editModal.notes // 傳送新備註
       });
       setAlertMsg("✅ 訂單與 PDF 已成功更新！");
-      setEditModal({ isOpen: false, order: null, eventDate: '', eventTime: '', location: '' });
+      setEditModal({ isOpen: false, order: null, eventDate: '', eventTime: '', location: '', notes: '' });
       fetchOrders();
     } catch (err) {
       setAlertMsg("❌ 更新失敗：" + err.message);
@@ -189,7 +195,7 @@ export default function AdminDashboard() {
   }, [orders, searchTerm]);
 
   // ==========================================
-  // 4. 權限渲染判斷 (字體大 2 號)
+  // 4. 權限渲染判斷
   // ==========================================
   if (authStatus === 'checking') return <div className="h-screen flex items-center justify-center bg-gray-50 text-2xl font-bold">驗證中...</div>;
   
@@ -209,42 +215,82 @@ export default function AdminDashboard() {
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100 text-darkWood">
       
-      {/* 🚀 側邊導覽列 (字體加大) */}
-      <aside className={`fixed md:static inset-y-0 left-0 w-80 bg-white shadow-xl z-50 flex flex-col transform transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="p-8 border-b border-gray-100">
-           <h1 className="text-3xl font-bold text-amberRed tracking-widest">李伯伯後台</h1>
-           <p className="text-sm text-gray-400 mt-2 font-medium">版本: 2.0 (全字體加大版)</p>
+      {/* 🚀 伸縮式側邊導覽列 */}
+      <aside className={`fixed md:static inset-y-0 left-0 bg-white shadow-xl z-50 flex flex-col transition-all duration-300 ease-in-out ${isSidebarExpanded ? 'w-64' : 'w-20'} ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        
+        {/* 頂部 Logo 與 切換按鈕 */}
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between overflow-hidden">
+           {isSidebarExpanded ? (
+             <h1 className="text-2xl font-bold text-amberRed tracking-widest whitespace-nowrap">李伯伯</h1>
+           ) : (
+             <span className="text-2xl font-bold text-amberRed mx-auto">李</span>
+           )}
+           <button 
+             onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+             className="hidden md:flex items-center justify-center w-8 h-8 hover:bg-gray-100 rounded-full transition-colors"
+           >
+             <svg className={`w-5 h-5 text-gray-400 transition-transform ${isSidebarExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+             </svg>
+           </button>
         </div>
         
-        <div className="px-8 py-6 bg-gray-50 border-b border-gray-100 flex items-center gap-4">
-          {userProfile?.pictureUrl && <img src={userProfile.pictureUrl} className="w-14 h-14 rounded-full border-2 border-white shadow-sm"/>}
-          <div>
-            <p className="text-lg font-bold text-gray-800">{userProfile?.displayName}</p>
-            <p className="text-xs text-green-600 font-bold">● 線上管理中</p>
-          </div>
+        {/* 使用者資訊 */}
+        <div className={`px-4 py-6 bg-gray-50 border-b border-gray-100 flex items-center transition-all ${isSidebarExpanded ? 'gap-4' : 'justify-center'}`}>
+          {userProfile?.pictureUrl && <img src={userProfile.pictureUrl} className="w-10 h-10 rounded-full border-2 border-white shadow-sm flex-shrink-0"/>}
+          {isSidebarExpanded && (
+            <div className="overflow-hidden">
+              <p className="text-lg font-bold text-gray-800 truncate">{userProfile?.displayName}</p>
+              <p className="text-xs text-green-600 font-bold whitespace-nowrap">● 管理中</p>
+            </div>
+          )}
         </div>
 
-        <nav className="flex-1 p-6 space-y-4">
-          <button onClick={() => {setActiveTab('dashboard'); setIsMobileMenuOpen(false);}} className={`w-full text-left px-6 py-5 rounded-2xl text-xl transition-all ${activeTab === 'dashboard' ? 'bg-amberRed/10 text-amberRed font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>
-            📊 排程與備料
+        {/* 功能選單 */}
+        <nav className="flex-1 p-3 space-y-2 overflow-x-hidden">
+          <button 
+            onClick={() => {setActiveTab('dashboard'); setIsMobileMenuOpen(false);}} 
+            className={`w-full flex items-center px-4 py-4 rounded-2xl text-xl transition-all ${activeTab === 'dashboard' ? 'bg-amberRed/10 text-amberRed font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-50'} ${!isSidebarExpanded ? 'justify-center' : ''}`}
+            title="排程與備料"
+          >
+            <span className="flex-shrink-0">📊</span>
+            {isSidebarExpanded && <span className="ml-4 whitespace-nowrap">排程與備料</span>}
           </button>
-          <button onClick={() => {setActiveTab('orders'); setIsMobileMenuOpen(false);}} className={`w-full text-left px-6 py-5 rounded-2xl text-xl transition-all ${activeTab === 'orders' ? 'bg-amberRed/10 text-amberRed font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>
-            📋 訂單總覽
+          
+          <button 
+            onClick={() => {setActiveTab('orders'); setIsMobileMenuOpen(false);}} 
+            className={`w-full flex items-center px-4 py-4 rounded-2xl text-xl transition-all ${activeTab === 'orders' ? 'bg-amberRed/10 text-amberRed font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-50'} ${!isSidebarExpanded ? 'justify-center' : ''}`}
+            title="訂單總覽"
+          >
+            <span className="flex-shrink-0">📋</span>
+            {isSidebarExpanded && <span className="ml-4 whitespace-nowrap">訂單總覽</span>}
           </button>
-          <button onClick={() => {setActiveTab('settings'); setIsMobileMenuOpen(false);}} className={`w-full text-left px-6 py-5 rounded-2xl text-xl transition-all ${activeTab === 'settings' ? 'bg-amberRed/10 text-amberRed font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>
-            ⚙️ 系統設定
+          
+          <button 
+            onClick={() => {setActiveTab('settings'); setIsMobileMenuOpen(false);}} 
+            className={`w-full flex items-center px-4 py-4 rounded-2xl text-xl transition-all ${activeTab === 'settings' ? 'bg-amberRed/10 text-amberRed font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-50'} ${!isSidebarExpanded ? 'justify-center' : ''}`}
+            title="系統設定"
+          >
+            <span className="flex-shrink-0">⚙️</span>
+            {isSidebarExpanded && <span className="ml-4 whitespace-nowrap">系統設定</span>}
           </button>
         </nav>
         
-        <div className="p-6 border-t border-gray-100">
-          <button onClick={handleLogout} className="w-full py-4 text-lg text-red-500 font-bold hover:bg-red-50 rounded-2xl transition-colors border border-red-100">
-            登出系統
+        {/* 登出按鈕 */}
+        <div className="p-3 border-t border-gray-100">
+          <button 
+            onClick={handleLogout} 
+            className={`w-full py-3 flex items-center justify-center text-lg text-red-500 font-bold hover:bg-red-50 rounded-2xl transition-colors border border-red-50 ${isSidebarExpanded ? 'px-4' : 'px-0'}`}
+            title="登出系統"
+          >
+            <span>🚪</span>
+            {isSidebarExpanded && <span className="ml-2">登出</span>}
           </button>
         </div>
       </aside>
 
       {/* 🚀 主內容區 */}
-      <main className="flex-1 overflow-y-auto p-6 md:p-12 relative scrollbar-hide">
+      <main className="flex-1 overflow-y-auto p-6 md:p-10 relative scrollbar-hide">
         {isLoading && (
           <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-20 flex items-center justify-center">
             <div className="bg-white px-8 py-4 rounded-full shadow-2xl text-amberRed font-bold text-xl animate-pulse border border-amberRed/20">更新資料中...</div>
@@ -273,7 +319,8 @@ export default function AdminDashboard() {
               order: o, 
               eventDate: o.eventDate || '', 
               eventTime: o.eventTime || '', 
-              location: o.specificDetails || '' 
+              location: o.specificDetails || '',
+              notes: o.notes || '' // 將備註帶入彈窗
             })}
             onResendClick={(o) => setResendModal({ isOpen: true, order: o, email: o.ordererEmail || '' })}
           />
@@ -281,14 +328,14 @@ export default function AdminDashboard() {
 
         {/* 3. 系統設定 */}
         {activeTab === 'settings' && (
-          <div className="max-w-3xl mx-auto space-y-10 animate-[fadeIn_0.3s_ease-out]">
+          <div className="max-w-3xl mx-auto space-y-8 animate-[fadeIn_0.3s_ease-out]">
             <header>
               <h2 className="text-4xl font-bold text-gray-800">系統設定</h2>
               <p className="text-xl text-gray-500 mt-2">管理 LINE 每日提醒機器人作業</p>
             </header>
             
-            <div className="bg-white rounded-3xl p-10 shadow-sm border border-gray-100">
-              <h3 className="text-2xl font-bold text-gray-800 mb-8 border-b border-gray-100 pb-6">LINE 每日出貨提醒</h3>
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+              <h3 className="text-2xl font-bold text-gray-800 mb-6 border-b border-gray-100 pb-4">LINE 每日出貨提醒</h3>
               <div className="space-y-8">
                 <div className="flex items-center justify-between">
                   <div>
@@ -299,7 +346,7 @@ export default function AdminDashboard() {
                     type="checkbox" 
                     checked={settings.reminderEnabled} 
                     onChange={e => setSettings({...settings, reminderEnabled: e.target.checked})} 
-                    className="w-8 h-8 accent-amberRed rounded-lg"
+                    className="w-8 h-8 accent-amberRed rounded-lg cursor-pointer"
                   />
                 </div>
                 

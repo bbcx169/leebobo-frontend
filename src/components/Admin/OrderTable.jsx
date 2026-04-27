@@ -116,7 +116,7 @@ export default function OrderTable({
                             {order.eventDate}
                           </span>
                           {order.isModified && (
-                            <span className="bg-blue-50 text-blue-600 border border-blue-200 text-xs px-2 py-1 rounded font-bold">已改期</span>
+                            <span className="bg-blue-50 text-blue-600 border border-blue-200 text-xs px-2 py-1 rounded font-bold whitespace-nowrap">已改期</span>
                           )}
                         </div>
                         <div className="text-sm text-gray-500 mt-1.5 font-medium">{order.eventTime || '未定時'}</div>
@@ -138,9 +138,9 @@ export default function OrderTable({
                       <td className="px-6 py-5">
                         <div className="flex flex-col items-start gap-2">
                           {isPickup ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-600 border border-orange-200 rounded-lg text-sm font-bold">🏪 門市自取</span>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-600 border border-orange-200 rounded-lg text-sm font-bold whitespace-nowrap">🏪 門市自取</span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-sm font-bold">🚚 專車配送</span>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-sm font-bold whitespace-nowrap">🚚 專車配送</span>
                           )}
                           <div className="text-sm text-gray-600 leading-relaxed line-clamp-2" title={addressText}>{addressText}</div>
                         </div>
@@ -152,8 +152,8 @@ export default function OrderTable({
 
                       <td className="px-6 py-5 text-center">
                         <div className="flex items-center justify-center gap-3">
-                          <button onClick={() => onEditClick(order)} className="px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-xl text-sm font-bold border border-blue-200 shadow-sm transition-all">改期/地點</button>
-                          <button onClick={() => onResendClick(order)} className="px-4 py-2 bg-white text-amberRed hover:bg-red-50 rounded-xl text-sm font-bold border border-amberRed/30 shadow-sm transition-all">補發 PDF</button>
+                          <button onClick={() => onEditClick(order)} className="px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-xl text-sm font-bold border border-blue-200 shadow-sm transition-all whitespace-nowrap">修改資訊</button>
+                          <button onClick={() => onResendClick(order)} className="px-4 py-2 bg-white text-amberRed hover:bg-red-50 rounded-xl text-sm font-bold border border-amberRed/30 shadow-sm transition-all whitespace-nowrap">補發 PDF</button>
                         </div>
                       </td>
                     </tr>
