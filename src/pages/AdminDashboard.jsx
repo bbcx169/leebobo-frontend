@@ -53,6 +53,10 @@ export default function AdminDashboard() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // 🚀 新增：密碼備用登入狀態
+  const [passwordInput, setPasswordInput] = useState('');
+  const [isVerifyingPwd, setIsVerifyingPwd] = useState(false);
+
   // ==========================================
   // 2. API 呼叫與權限驗證
   // ==========================================
@@ -121,6 +125,32 @@ export default function AdminDashboard() {
 
   const handleLogin = () => liff.login({ redirectUri: window.location.href });
   const handleLogout = () => { liff.logout(); window.location.reload(); };
+
+  // 🚀 新增：備用密碼登入邏輯
+  const handlePasswordLogin = async () => {
+    if (!passwordInput) {
+      setAlertMsg("請輸入管理員通關密碼");
+      return;
+    }
+    setIsVerifyingPwd(true);
+    try {
+      // 呼叫我們即將在 GAS 中新增的 verify_password API
+      const result = await callGasApi({ action: 'verify_password', password: passwordInput });
+      
+      if (result.status === 'success') {
+        setUserProfile({ displayName: '管理員 (密碼登入)', pictureUrl: null });
+        setAuthStatus('logged_in');
+        fetchOrders();
+        fetchSettings();
+      } else {
+        setAlertMsg("❌ 密碼錯誤，請確認後重試");
+      }
+    } catch (err) {
+      setAlertMsg("連線異常：" + err.message);
+    } finally {
+      setIsVerifyingPwd(false);
+    }
+  };
 
   // ==========================================
   // 3. 資料處理邏輯 (解決 DashboardStats 的 Crash 問題)
@@ -210,16 +240,57 @@ export default function AdminDashboard() {
   // 5. 渲染邏輯
   // ==========================================
   if (authStatus === 'checking') return <div className="h-screen flex items-center justify-center bg-gray-50 text-2xl font-bold">驗證中...</div>;
+  
+  // 🚀 更新：加入密碼備用登入介面的 unauth 狀態
   if (authStatus === 'unauth') return (
-    <div className="h-screen flex items-center justify-center bg-gray-100 p-6">
-      <div className="bg-white p-12 rounded-3xl shadow-xl text-center max-w-md w-full">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6 relative">
+      {/* 若有系統訊息則疊加顯示 */}
+      {alertMsg && (
+        <div className="absolute top-10 w-full max-w-sm z-50">
+          <div className="bg-red-50 text-red-600 font-bold px-6 py-4 rounded-2xl shadow-lg border border-red-200 text-center mx-auto relative">
+            {alertMsg}
+            <button onClick={() => setAlertMsg(null)} className="absolute right-4 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-700">✕</button>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white p-10 md:p-12 rounded-3xl shadow-xl text-center max-w-md w-full">
         <h1 className="text-3xl font-bold text-amberRed mb-8 tracking-widest">李伯伯管理後台</h1>
-        <button onClick={handleLogin} className="w-full bg-[#06C755] text-white px-10 py-5 rounded-2xl font-bold text-xl shadow-lg hover:scale-105 transition-transform">
-          LINE 管理員登入
+        
+        {/* LINE 登入按鈕 */}
+        <button onClick={handleLogin} className="w-full bg-[#06C755] text-white px-10 py-5 rounded-2xl font-bold text-xl shadow-lg hover:scale-105 transition-transform mb-6">
+          LINE 快捷登入
         </button>
+        
+        {/* 分隔線 */}
+        <div className="flex items-center gap-3 my-8">
+          <div className="h-px bg-gray-200 flex-1"></div>
+          <span className="text-gray-400 text-sm font-bold">或使用備用通道</span>
+          <div className="h-px bg-gray-200 flex-1"></div>
+        </div>
+
+        {/* 密碼登入區塊 */}
+        <div className="space-y-4">
+          <input 
+            type="password" 
+            placeholder="請輸入通關密碼" 
+            value={passwordInput} 
+            onChange={e => setPasswordInput(e.target.value)} 
+            onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
+            className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-lg outline-none focus:ring-2 focus:ring-gray-400 text-center tracking-widest placeholder:tracking-normal"
+          />
+          <button 
+            onClick={handlePasswordLogin} 
+            disabled={isVerifyingPwd}
+            className="w-full bg-gray-800 text-white px-10 py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-black transition-colors disabled:opacity-50"
+          >
+            {isVerifyingPwd ? '驗證中...' : '密碼登入'}
+          </button>
+        </div>
       </div>
     </div>
   );
+
   if (authStatus === 'unauthorized_user') return <div className="h-screen flex items-center justify-center bg-gray-50 text-red-500 font-bold text-2xl">抱歉，您沒有管理員權限。</div>;
 
   return (
@@ -229,13 +300,17 @@ export default function AdminDashboard() {
       <aside className={`fixed md:static inset-y-0 left-0 bg-white shadow-xl z-50 flex flex-col transition-all duration-300 ease-in-out ${isSidebarExpanded ? 'w-64' : 'w-20'} ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-4 border-b border-gray-100 flex items-center justify-between overflow-hidden">
            {isSidebarExpanded ? <h1 className="text-2xl font-bold text-amberRed tracking-widest whitespace-nowrap">李伯伯</h1> : <span className="text-2xl font-bold text-amberRed mx-auto">李</span>}
-           <button onClick={() => setIsSidebarExpanded(!isSidebarExpanded)} className="hidden md:flex items-center justify-center w-8 h-8 hover:bg-gray-100 rounded-full">
+           <button onClick={() => setIsSidebarExpanded(!isSidebarExpanded)} className="hidden md:flex items-center justify-center w-8 h-8 hover:bg-gray-100 rounded-full transition-colors">
              <svg className={`w-5 h-5 text-gray-400 transition-transform ${isSidebarExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 5l7 7-7 7M5 5l7 7-7 7" strokeWidth="2"/></svg>
            </button>
         </div>
         
-        <div className={`px-4 py-6 bg-gray-50 border-b border-gray-100 flex items-center ${isSidebarExpanded ? 'gap-4' : 'justify-center'}`}>
-          {userProfile?.pictureUrl && <img src={userProfile.pictureUrl} className="w-10 h-10 rounded-full border-2 border-white shadow-sm flex-shrink-0"/>}
+        <div className={`px-4 py-6 bg-gray-50 border-b border-gray-100 flex items-center transition-all ${isSidebarExpanded ? 'gap-4' : 'justify-center'}`}>
+          {userProfile?.pictureUrl ? (
+            <img src={userProfile.pictureUrl} className="w-10 h-10 rounded-full border-2 border-white shadow-sm flex-shrink-0" alt="avatar" />
+          ) : (
+            <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm flex-shrink-0 bg-amberRed flex items-center justify-center text-white font-bold text-sm">管</div>
+          )}
           {isSidebarExpanded && (
             <div className="overflow-hidden">
               <p className="text-lg font-bold text-gray-800 truncate">{userProfile?.displayName}</p>
@@ -248,13 +323,13 @@ export default function AdminDashboard() {
           {[
             { id: 'dashboard', icon: '📊', label: '排程與備料' },
             { id: 'orders', icon: '📋', label: '訂單總覽' },
-            { id: 'revenue', icon: '💰', label: '營收報表' }, // 🚀 新增營收報表入口
+            { id: 'revenue', icon: '💰', label: '營收報表' },
             { id: 'settings', icon: '⚙️', label: '系統設定' }
           ].map(item => (
             <button 
               key={item.id}
               onClick={() => {setActiveTab(item.id); setIsMobileMenuOpen(false);}} 
-              className={`w-full flex items-center px-4 py-4 rounded-2xl text-xl transition-all ${activeTab === item.id ? 'bg-amberRed/10 text-amberRed font-bold' : 'text-gray-600 hover:bg-gray-50'} ${!isSidebarExpanded ? 'justify-center' : ''}`}
+              className={`w-full flex items-center px-4 py-4 rounded-2xl text-xl transition-all ${activeTab === item.id ? 'bg-amberRed/10 text-amberRed font-bold shadow-sm' : 'text-gray-600 hover:bg-gray-50'} ${!isSidebarExpanded ? 'justify-center' : ''}`}
               title={item.label}
             >
               <span className="flex-shrink-0">{item.icon}</span>
@@ -263,9 +338,26 @@ export default function AdminDashboard() {
           ))}
         </nav>
         
-        <div className="p-3 border-t border-gray-100">
-          <button onClick={handleLogout} className={`w-full py-3 flex items-center justify-center text-lg text-red-500 font-bold hover:bg-red-50 rounded-2xl ${isSidebarExpanded ? 'px-4' : 'px-0'}`}>
-            <span>🚪</span>{isSidebarExpanded && <span className="ml-2">登出</span>}
+        {/* 🚀 更新：返回前台與登出區塊 */}
+        <div className="p-3 border-t border-gray-100 space-y-2">
+          {/* 返回前台按鈕 */}
+          <button 
+            onClick={() => window.location.href = '/'} 
+            className={`w-full py-3 flex items-center justify-center text-lg text-gray-600 font-bold hover:bg-gray-50 rounded-2xl transition-colors border border-transparent hover:border-gray-100 ${isSidebarExpanded ? 'px-4' : 'px-0'}`}
+            title="返回前台首頁"
+          >
+            <span>🏠</span>
+            {isSidebarExpanded && <span className="ml-2">返回前台</span>}
+          </button>
+          
+          {/* 登出按鈕 */}
+          <button 
+            onClick={handleLogout} 
+            className={`w-full py-3 flex items-center justify-center text-lg text-red-500 font-bold hover:bg-red-50 rounded-2xl transition-colors border border-red-50 ${isSidebarExpanded ? 'px-4' : 'px-0'}`}
+            title="登出系統"
+          >
+            <span>🚪</span>
+            {isSidebarExpanded && <span className="ml-2">登出</span>}
           </button>
         </div>
       </aside>
@@ -278,7 +370,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* 1. 排程與備料看板 (修復 Props 傳遞) */}
+        {/* 1. 排程與備料看板 */}
         {activeTab === 'dashboard' && (
           <DashboardStats 
             orders={orders} 
@@ -329,11 +421,11 @@ export default function AdminDashboard() {
                     <label className="text-xl font-bold text-gray-700">啟用提醒功能</label>
                     <p className="text-base text-gray-400 mt-1">開啟後，系統將於每日指定時間發送明日訂單報表。</p>
                   </div>
-                  <input type="checkbox" checked={settings.reminderEnabled} onChange={e => setSettings({...settings, reminderEnabled: e.target.checked})} className="w-8 h-8 accent-amberRed rounded-lg" />
+                  <input type="checkbox" checked={settings.reminderEnabled} onChange={e => setSettings({...settings, reminderEnabled: e.target.checked})} className="w-8 h-8 accent-amberRed rounded-lg cursor-pointer" />
                 </div>
                 <div className={`transition-all ${settings.reminderEnabled ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
                   <label className="block text-lg font-bold text-gray-700 mb-3">發送時間</label>
-                  <input type="time" value={settings.reminderTime} onChange={e => setSettings({...settings, reminderTime: e.target.value})} className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-xl outline-none" />
+                  <input type="time" value={settings.reminderTime} onChange={e => setSettings({...settings, reminderTime: e.target.value})} className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-xl outline-none focus:ring-2 focus:ring-amberRed" />
                 </div>
                 <div className="pt-6 border-t border-gray-100">
                   <button onClick={handleSaveSettings} disabled={isSavingSettings} className="px-12 py-4 bg-darkWood text-white font-bold text-xl rounded-2xl hover:bg-black transition-all shadow-lg disabled:opacity-50">儲存設定</button>
