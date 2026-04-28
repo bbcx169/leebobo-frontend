@@ -1,41 +1,47 @@
-# 這是自動化佈署的腳本名稱
+# 🚀 李伯伯電商系統 - GitHub Pages 自動化部署流程
 name: Deploy to GitHub Pages
 
 on:
-  # 當 main 分支有 push 動作時觸發
+  # 當代碼推送到 main 分支時觸發
   push:
-    branches: [ "main" ]
+    branches:
+      - main
 
-# 設定權限，允許寫入 GitHub Pages
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 jobs:
-  build_site:
+  build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      # 1. 檢出原始碼
+      - name: Checkout 🛎️
         uses: actions/checkout@v4
 
-      - name: Install Node.js
+      # 2. 設定 Node.js 環境
+      - name: Set up Node.js ⚙️
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 18
           cache: 'npm'
 
-      - name: Install dependencies
+      # 3. 安裝相依套件
+      - name: Install dependencies 📦
         run: npm install
 
-      - name: Build
+      # 4. 執行編譯 (產出 dist 資料夾)
+      - name: Build 🏗️
         run: npm run build
 
-      - name: Upload Artifacts
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # 注意：Vite 編譯後的資料夾預設是 dist
-          path: 'dist/'
+      # 5. 💡 SPA 關鍵補丁：複製 index.html 為 404.html
+      # 這是為了解決 GitHub Pages 重新整理時找不到路徑的問題
+      - name: Fix SPA 404 Error 🛠️
+        run: cp dist/index.html dist/404.html
 
-      - name: Deploy
-        uses: actions/deploy-pages@v4
+      # 6. 自動部署至 gh-pages 分支
+      - name: Deploy 🚀
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist # 要發布的資料夾
+          branch: gh-pages # 目標分支
