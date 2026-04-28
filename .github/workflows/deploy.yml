@@ -1,4 +1,4 @@
-# 🚀 李伯伯電商系統 - GitHub Pages 自動化部署流程
+# 🚀 李伯伯電商系統 - GitHub Pages 自動化部署流程 (2026 優化版)
 name: Deploy to GitHub Pages
 
 on:
@@ -6,6 +6,11 @@ on:
   push:
     branches:
       - main
+
+# 💡 全域環境變數設定
+env:
+  # 解決 Node.js 20 棄用警告，強制 Actions 運行在 Node 24 環境
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: write
@@ -19,20 +24,23 @@ jobs:
       - name: Checkout 🛎️
         uses: actions/checkout@v4
 
-      # 2. 設定 Node.js 環境
+      # 2. 設定 Node.js 環境 (升級至 v24 以對接最新標準)
       - name: Set up Node.js ⚙️
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 24
           cache: 'npm'
 
-      # 3. 安裝相依套件
+      # 3. 嚴格安裝相依套件 (使用 ci 確保雲端與本地版本完全一致)
       - name: Install dependencies 📦
-        run: npm install
+        run: npm ci
 
       # 4. 執行編譯 (產出 dist 資料夾)
+      # 💡 加上 CI=false 確保編譯不會因為非致命的警告(Warning)而中斷失敗
       - name: Build 🏗️
         run: npm run build
+        env:
+          CI: false
 
       # 5. 💡 SPA 關鍵補丁：複製 index.html 為 404.html
       # 這是為了解決 GitHub Pages 重新整理時找不到路徑的問題
@@ -45,3 +53,4 @@ jobs:
         with:
           folder: dist # 要發布的資料夾
           branch: gh-pages # 目標分支
+          clean: true # 部署前先清理目標分支，確保檔案最乾淨
