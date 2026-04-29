@@ -10,7 +10,13 @@ const OrderProcess = ({ navigateTo }) => {
     const [openFaqId, setOpenFaqId] = useState("cat-0-item-0");
     
     const timelineSteps = [
-        { id: 1, title: "挑選品項", desc: ["選擇經典或婚禮系列", "確認商品口味與數量"], icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg> },
+        { 
+            id: 1, 
+            title: "挑選品項", 
+            // 💡 修正：更新文字內容
+            desc: ["選擇經典或婚禮系列", "確認商品口味與數量", "店家每日產能上限 800 支"], 
+            icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg> 
+        },
         { id: 2, title: "確認門檻", desc: ["最低起訂量 50 支", "活動日前 14 天預訂"], icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> },
         { id: 3, title: "填寫資訊", desc: ["選擇您的活動類別", "填寫精確收貨與場地資訊"], icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg> },
         { id: 4, title: "送出訂單", desc: ["確認總金額與運費", "系統自動生成 PDF 備份"], icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg> },
@@ -18,14 +24,44 @@ const OrderProcess = ({ navigateTo }) => {
     ];
 
     const faqCategories = [
-        { category: "📦 關於訂購規範", items: [{ q: "最低訂購數量是多少？", a: "為了維持職人熬糖的品質與新鮮度，單筆訂單糖葫蘆總數需達 50 支（不限口味組合）才予出貨。" }, { q: "我需要提前多久訂購？", a: "所有產品皆為接單後新鮮製作。請務必於活動日前 14 天完成預訂，以利職人備料。" }, { q: "送出訂單後如何確認是否成功？", a: "送出後系統會生成 PDF 明細，請務必點擊連結加入「LINE 官方帳號」告知訂單編號，待專人核對細節後訂單才正式成立。" }, { q: "可以更改訂購數量或口味嗎？", a: "若需調整請於活動日 7 天前透過 LINE 或 電話 聯繫。因 14 天內已進入備料階段，我們將盡力協助但不保證能修改。" }] },
-        { category: "🚚 配送與取貨", items: [{ q: "運費如何計算？", a: "臺北市與新北市：商品金額滿 $5,000 元享免運；未達門檻則酌收 $350 元運費。外縣市：目前受限於物流品質，暫不提供宅配，需由顧客配合自取。" }, { q: "可以指定精準的送達時間嗎？", a: "可選擇時段，但受路況影響，建議將收貨時間設定在活動開始前 1-2 小時，保留彈性緩衝。" }] },
-        { category: "❄️ 食用與保存", items: [{ q: "糖葫蘆可以保存多久？", a: "糖衣極易受濕度與溫度影響，我們堅持無添加。強烈建議在收貨後 2 小時內食用完畢口感最佳。" }, { q: "如果不立刻吃，該怎麼保存？", a: "請務必放入「冷藏」保存。注意：請勿放入冷凍庫，以免糖衣因溫差退冰而融化受潮。" }, { q: "李伯伯的糖葫蘆會黏牙嗎？", a: "不會。李伯伯堅持古法手工熬製糖漿，特點是糖衣「薄、脆、不黏牙」。" }] },
-        { category: "🌹 婚禮專屬：甜蜜常見問題", items: [{ q: "婚禮系列與一般款有什麼不同？", a: "婚禮系列專為喜宴設計，採用小巧好入口的「喜糖尺寸」，並賦予「永結同心」、「佳偶天成」等專屬寓意。" }, { q: "糖葫蘆有附包裝嗎？可以當二進禮嗎？", a: "有的。每支均附透明包裝與喜慶紅心貼紙，非常適合直接作為桌上禮或二進小禮使用。" }, { q: "什麼時間點收貨最合適？", a: "強烈建議將收貨時間設定在宴客開始前 2 小時，並請婚企人員協助先存放在冷藏環境。" }] }
+        { 
+            category: "📦 關於訂購規範", 
+            items: [
+                { q: "最低訂購數量是多少？", a: "為了維持職人熬糖的品質與新鮮度，單筆訂單糖葫蘆總數需達 50 支（不限口味組合）才予出貨。" }, 
+                { q: "單日訂購數量有上限嗎？", a: "有的。為了堅持每一支糖葫蘆都是當日純手工新鮮熬製，確保糖衣薄脆不黏牙的最高品質，我們每日的產能上限為 800 支。若您預定日期的額度已滿，系統會溫馨提醒您微調數量或更改日期。感謝您的體諒與支持，讓我們為您呈現最完美的甜蜜！🍡" },
+                { q: "我需要提前多久訂購？", a: "所有產品皆為接單後新鮮製作。請務必於活動日前 14 天完成預訂，以利職人備料。" }, 
+                { q: "送出訂單後如何確認是否成功？", a: "送出後系統會生成 PDF 明細，請務必點擊連結加入「LINE 官方帳號」告知訂單編號，待專人核對細節後訂單才正式成立。" }, 
+                { q: "可以更改訂購數量或口味嗎？", a: "若需調整請於活動日 7 天前透過 LINE 或 電話 聯繫。因 14 天內已進入備料階段，我們將盡力協助但不保證能修改。" }
+            ] 
+        },
+        { 
+            category: "🚚 配送與取貨", 
+            items: [
+                { q: "運費如何計算？", a: "臺北市與新北市：商品金額滿 $5,000 元享免運；未達門檻則酌收 $350 元運費。外縣市：目前受限於物流品質，暫不提供宅配，需由顧客配合自取。" }, 
+                { q: "可以指定精準的送達時間嗎？", a: "可選擇時段，但受路況影響，建議將收貨時間設定在活動開始前 1-2 小時，保留彈性緩衝。" }
+            ] 
+        },
+        { 
+            category: "❄️ 食用與保存", 
+            items: [
+                { q: "糖葫蘆可以保存多久？", a: "糖衣極易受濕度與溫度影響，我們堅持無添加。強烈建議在收貨後 2 小時內食用完畢口感最佳。" }, 
+                { q: "如果不立刻吃，該怎麼保存？", a: "請務必放入「冷藏」保存。注意：請勿放入冷凍庫，以免糖衣因溫差退冰而融化受潮。" }, 
+                { q: "李伯伯的糖葫蘆會黏牙嗎？", a: "不會。李伯伯堅持古法手工熬製糖漿，特點是糖衣「薄、脆、不黏牙」。" }
+            ] 
+        },
+        { 
+            category: "🌹 婚禮專屬：甜蜜常見問題", 
+            items: [
+                { q: "婚禮系列與一般款有什麼不同？", a: "婚禮系列專為喜宴設計，採用小巧好入口的「喜糖尺寸」，並賦予「永結同心」、「佳偶天成」等專屬寓意。" }, 
+                { q: "糖葫蘆有附包裝嗎？可以當二進禮嗎？", a: "有的。每支均附透明包裝與喜慶紅心貼紙，非常適合直接作為桌上禮或二進小禮使用。" }, 
+                { q: "什麼時間點收貨最合適？", a: "強烈建議將收貨時間設定在宴客開始前 2 小時，並請婚企人員協助先存放在冷藏環境。" }
+            ] 
+        }
     ];
 
     return (
-        <div className="relative z-10 container mx-auto px-4 sm:px-6 pt-32 pb-12 lg:pb-20 max-w-5xl">
+        <div className="relative z-10 container mx-auto px-4 sm:px-6 pt-32 pb-12 lg:pb-20 max-w-6xl">
+            {/* 💡 修正：放寬容器 max-width 從 max-w-5xl 變為 max-w-6xl 給予更多橫向空間 */}
             {/* 背景特效 */}
             <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
                 <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-[#D2B48C] rounded-full mix-blend-multiply filter blur-[100px] opacity-30 animate-pulse"></div>
@@ -59,10 +95,12 @@ const OrderProcess = ({ navigateTo }) => {
                     <span className="w-8 h-px bg-gray-300"></span>訂購五步驟<span className="w-8 h-px bg-gray-300"></span>
                 </h2>
                 <div className="bg-white/60 backdrop-blur-xl border border-white/80 rounded-3xl p-8 shadow-sm bg-wood-texture relative">
-                    <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-8 md:gap-4">
-                        <div className="hidden md:block absolute top-1/2 left-[10%] right-[10%] h-1 bg-warmWood/30 -translate-y-[20px] rounded-full z-0"></div>
+                    {/* 💡 修正：將 md:items-center 改為 md:items-start 讓頂部絕對對齊 */}
+                    <div className="relative flex flex-col md:flex-row justify-between items-start md:items-start gap-8 md:gap-4">
+                        {/* 💡 修正：橫向連接線固定在 top-7 的位置，完美貫穿 Icon 中心 */}
+                        <div className="hidden md:block absolute top-7 left-[10%] right-[10%] h-1 bg-warmWood/30 -translate-y-1/2 rounded-full z-0"></div>
                         {timelineSteps.map((step, index) => (
-                            <div key={step.id} className="relative z-10 flex md:flex-col items-center gap-4 md:gap-3 w-full md:w-1/5 group">
+                            <div key={step.id} className="relative z-10 flex md:flex-col items-center md:items-center gap-4 md:gap-3 w-full md:w-1/5 group">
                                 <div className="w-14 h-14 shrink-0 rounded-full bg-white border-4 border-amberRed text-amberRed flex items-center justify-center font-bold text-xl shadow-md group-hover:bg-amberRed group-hover:text-white transition-all duration-300 transform group-hover:scale-110">{step.icon}</div>
                                 {index !== timelineSteps.length - 1 && <div className="md:hidden absolute top-14 bottom-[-32px] left-[27px] w-0.5 bg-warmWood/50 z-0"></div>}
                                 <div className="pt-2 md:pt-4 w-full">
@@ -89,7 +127,7 @@ const OrderProcess = ({ navigateTo }) => {
                     <div className="space-y-5">
                         <div>
                             <h4 className="font-bold text-[#8B4513] mb-1 flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-amberRed"></span>雙北地區專車配送</h4>
-                            <p className="text-sm text-gray-700 pl-3.5">商品小計滿 <span className="font-bold text-amberRed">NT$5,000</span> 享免運。<br/>未達門檻酌收 NT$350 運費。</p>
+                            <p className="text-sm text-gray-700 pl-3.5">商品小計滿 <span className="font-bold text-amberRed">NT$5,000 （不含掃帚租押金）</span> 享免運。<br/>未達門檻酌收 NT$350 運費。</p>
                         </div>
                         <div>
                             <h4 className="font-bold text-[#8B4513] mb-1 flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-amberRed"></span>外縣市地區</h4>

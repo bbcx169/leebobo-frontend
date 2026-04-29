@@ -18,6 +18,7 @@ const Checkout = ({
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({ ...initialFormData });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingDate, setIsCheckingDate] = useState(false); // 💡 新增：檢查產能中的狀態
   const [isSameAsOrderer, setIsSameAsOrderer] = useState(false);
 
   useEffect(() => {
@@ -58,7 +59,7 @@ const Checkout = ({
     if (formData.deliveryCity === 'pickup') { 
         shippingFee = 0; 
         shippingHint = "(自取)"; 
-    } else if (formData.deliveryCity === 'taipei' || formData.deliveryCity === 'new_taipei') {
+    } else if (formData.deliveryCity === 'taipei' || formData.deliveryCity === 'new_taibei' || formData.deliveryCity === 'new_taipei') {
         shippingFee = candySubtotal >= 5000 ? 0 : 350; 
         shippingHint = candySubtotal >= 5000 ? "(達標免運 🎉)" : `(還差 $${(5000 - candySubtotal).toLocaleString()} 享免運)`; 
     }
@@ -72,12 +73,6 @@ const Checkout = ({
     let { name, value } = e.target;
     if (name === 'ordererPhone' || name === 'recipientPhone') {
       value = value.replace(/\D/g, ''); 
-    }
-    if ((name === 'weddingDate' || name === 'generalDate') && value) {
-      if (value < getMinDate()) { 
-        setAlertMsg(`日期需為 14 天後（最早：${getMinDate()}）。`); 
-        return; 
-      }
     }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -93,7 +88,7 @@ const Checkout = ({
   };
 
   const isLocked = formData.deliveryCity === 'pickup';
-  const cityMap = { taipei: '臺北市', new_taipei: '新北市', pickup: '自取' };
+  const cityMap = { taipei: '臺北市', new_taibei: '新北市', new_taipei: '新北市', pickup: '自取' };
   const currentCityName = cityMap[formData.deliveryCity] || '請選擇縣市';
 
   const renderDetailRow = (label, value) => (
@@ -105,15 +100,46 @@ const Checkout = ({
     </React.Fragment>
   );
 
-  const nextStep = () => {
+  const nextStep = async () => {
     if (currentStep === 1) {
       if (!formData.eventType || !(formData.weddingDate || formData.generalDate)) {
         setAlertMsg("請先選擇活動類型與日期。"); return;
       }
+
+      const selectedDate = formData.weddingDate || formData.generalDate;
+      if (selectedDate < getMinDate()) { 
+        setAlertMsg(`日期需為 14 天後（最早：${getMinDate()}）。`); 
+        return; 
+      }
+
       if (candyQty > 0 && candyQty < 50) {
         setAlertMsg(`總訂購量最低需達 50 支，目前僅 ${candyQty} 支。`); return;
       }
+
+      // 💡 第一道防線：呼叫 GAS 檢查該日期的剩餘產能
+      setIsCheckingDate(true);
+      try {
+        const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzf8kJ6Ka8yGabg--MCRJ8eyucBbsGRDbceGEeH-CQDLqOMXhTCysZVrPKL0MLpSg4L/exec';
+        const response = await fetch(`${SCRIPT_URL}?action=check_availability&date=${selectedDate}`);
+        const result = await response.json();
+
+        if (result.status === 'success') {
+          const remaining = result.remaining;
+          if (candyQty > remaining) {
+            setAlertMsg(`非常抱歉，為堅持手工新鮮製作的品質，我們每日產能上限為 800 支。您選擇的日期目前剩餘可訂購額度為 ${remaining} 支。再麻煩您幫我們微調數量，或選擇其他日期，感謝您的體諒！🍡`);
+            return; // 擋住，不進入下一步
+          }
+        }
+      } catch (error) {
+        console.error("產能檢查失敗:", error);
+        // 若 API 異常，可選擇擋下或放行（交由第二道防線處理）。這裡為了保險起見提示使用者。
+        setAlertMsg("系統暫時無法核對產能額度，請檢查網路連線或稍後再試。");
+        return;
+      } finally {
+        setIsCheckingDate(false);
+      }
     }
+
     if (currentStep === 2) {
       if (!formData.deliveryCity) { setAlertMsg("請選擇配送縣市。"); return; }
       if (!isLocked) {
@@ -126,6 +152,7 @@ const Checkout = ({
          if (!location) { setAlertMsg("請填寫活動地點名稱。"); return; }
       }
     }
+
     if (currentStep === 3) {
       if (!formData.ordererName || !formData.ordererPhone || !formData.recipientName || !formData.recipientPhone) {
         setAlertMsg("請完整填寫聯絡資訊。"); return;
@@ -139,7 +166,6 @@ const Checkout = ({
         setAlertMsg("收貨人聯絡電話格式錯誤，請輸入完整的 10 位數字。"); return;
       }
 
-      // 💡 新增：驗證電子信箱格式
       if (formData.ordererEmail) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(formData.ordererEmail)) {
@@ -185,23 +211,34 @@ const Checkout = ({
       const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzf8kJ6Ka8yGabg--MCRJ8eyucBbsGRDbceGEeH-CQDLqOMXhTCysZVrPKL0MLpSg4L/exec';
       const response = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
       const result = await response.json();
-      if (result.status === 'success') { onOrderSuccess({ payload, orderNumber: payload.orderNumber, cart: { ...cart }, candyQty, broomQty, candySubtotal, broomRent, broomDeposit, shippingFee, totalPrice, pdfDownloadUrl: result.pdfDownloadUrl }); }
-      else { setAlertMsg(["⚠️ 失敗", result.message]); }
-    } catch (error) { setAlertMsg(["⚠️ 連線失敗", error.message]); } 
+      if (result.status === 'success') { 
+        onOrderSuccess({ payload, orderNumber: payload.orderNumber, cart: { ...cart }, candyQty, broomQty, candySubtotal, broomRent, broomDeposit, shippingFee, totalPrice, pdfDownloadUrl: result.pdfDownloadUrl }); 
+      }
+      else { 
+        // 💡 這裡會接收並顯示第二道防線擋下的「產能已滿」訊息
+        setAlertMsg(result.message); 
+      }
+    } catch (error) { 
+      setAlertMsg(["⚠️ 連線失敗", error.message]); 
+    } 
     finally { setIsSubmitting(false); }
   };
 
   return (
     <>
-      {isSubmitting && (
+      {(isSubmitting || isCheckingDate) && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-darkWood/60 backdrop-blur-sm transition-opacity">
           <div className="bg-pureWhite p-8 md:p-10 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm w-[90%] mx-auto text-center animate-[fadeIn_0.3s_ease-out]">
             <svg className="animate-spin h-14 w-14 text-amberRed mb-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <h3 className="text-xl md:text-2xl font-bold text-darkWood mb-3 tracking-wider font-serif">訂單處理中</h3>
-            <p className="text-sm md:text-base text-darkWood/80 leading-relaxed font-medium">系統正在處理您的訂單，請稍候...</p>
+            <h3 className="text-xl md:text-2xl font-bold text-darkWood mb-3 tracking-wider font-serif">
+              {isCheckingDate ? "核對產能中" : "訂單處理中"}
+            </h3>
+            <p className="text-sm md:text-base text-darkWood/80 leading-relaxed font-medium">
+              {isCheckingDate ? "正在為您確認當日可製作額度..." : "系統正在處理您的訂單，請稍候..."}
+            </p>
           </div>
         </div>
       )}
@@ -302,7 +339,6 @@ const Checkout = ({
                     <input type="text" name="ordererName" required placeholder="姓名 *" value={formData.ordererName} onChange={handleFormChange} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite outline-none" />
                     <input type="tel" name="ordererPhone" required maxLength="10" inputMode="numeric" placeholder="聯絡手機(10位數字)*" value={formData.ordererPhone} onChange={handleFormChange} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite outline-none" />
                     
-                    {/* 💡 包含溫馨提示與紅框驗證焦點的信箱輸入區塊 */}
                     <div className="md:col-span-2">
                       <input type="email" name="ordererEmail" placeholder="電子信箱" value={formData.ordererEmail} onChange={handleFormChange} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite outline-none focus:ring-2 focus:ring-amberRed transition-all" />
                       <p className="text-xs text-darkWood/60 mt-2 font-medium pl-1">💡 填寫可收取系統自動發送的訂單明細 (PDF)</p>
@@ -328,14 +364,11 @@ const Checkout = ({
               <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
                 <h2 className="text-2xl font-bold text-darkWood mb-6 font-serif flex items-center gap-2"><span className="bg-amberRed/10 p-2 rounded-lg text-amberRed">04</span> 確認訂單明細</h2>
                 <div className="bg-white p-6 rounded-2xl border border-warmWood/30 shadow-sm space-y-6 text-sm">
-                  
-                  {/* 活動資訊 */}
                   <div className="space-y-3">
                     <h3 className="text-base font-bold text-amberRed border-b border-warmWood/20 pb-2">活動資訊</h3>
                     <div className="grid grid-cols-[80px_1fr] gap-y-2">
                       {renderDetailRow('活動類型', formData.eventType === 'wedding' ? '浪漫婚禮 / 喜宴' : formData.eventType === 'school' ? '校園活動 / 園遊會' : '其他')}
                       {renderDetailRow('活動日期', formData.weddingDate || formData.generalDate)}
-                      
                       {isLocked ? (
                         <>
                           {renderDetailRow('取貨時間', '需配合商家時間地點自取')}
@@ -351,7 +384,6 @@ const Checkout = ({
                     </div>
                   </div>
 
-                  {/* 聯絡資訊 */}
                   <div className="space-y-3 pt-2">
                     <h3 className="text-base font-bold text-amberRed border-b border-warmWood/20 pb-2">聯絡資訊</h3>
                     <div className="grid grid-cols-[80px_1fr] gap-y-2">
@@ -362,7 +394,6 @@ const Checkout = ({
                     </div>
                   </div>
 
-                  {/* 🚀 補回購買項目區塊 */}
                   <div className="bg-creamBg/50 p-5 rounded-xl border border-warmWood/20">
                     <h3 className="text-base font-bold text-darkWood border-b border-warmWood/20 pb-2 mb-3">購買明細</h3>
                     <div className="space-y-3 mb-4">
@@ -376,7 +407,6 @@ const Checkout = ({
                           </div>
                         );
                       })}
-                      
                       {broomQty > 0 && (
                         <>
                           <div className="flex justify-between items-center">
@@ -389,29 +419,33 @@ const Checkout = ({
                           </div>
                         </>
                       )}
-                      
                       <div className="flex justify-between items-center">
                         <span className="text-darkWood font-medium">配送運費 <span className="text-amberRed text-xs ml-1">{shippingHint}</span></span>
                         <span className="text-darkWood font-bold">NT$ {shippingFee.toLocaleString()}</span>
                       </div>
                     </div>
-
                     <div className="pt-4 border-t border-warmWood/20 flex justify-between items-end">
                       <span className="text-sm font-bold text-darkWood">預估總金額</span>
                       <span className="text-2xl font-black text-amberRed">NT$ {totalPrice.toLocaleString()}</span>
                     </div>
                   </div>
-
                 </div>
               </div>
             )}
 
             <div className="mt-10 flex gap-4">
               {currentStep > 1 && (
-                <button type="button" onClick={prevStep} disabled={isSubmitting} className="flex-1 py-4 px-6 rounded-xl font-bold border-2 border-warmWood/30 text-darkWood/60 hover:bg-creamBg transition-all">上一步</button>
+                <button type="button" onClick={prevStep} disabled={isSubmitting || isCheckingDate} className="flex-1 py-4 px-6 rounded-xl font-bold border-2 border-warmWood/30 text-darkWood/60 hover:bg-creamBg transition-all">上一步</button>
               )}
               {currentStep < 4 ? (
-                <button type="button" onClick={nextStep} className="flex-[2] bg-amberRed text-white py-4 px-6 rounded-xl font-bold shadow-lg hover:bg-darkWood transition-all">繼續下一步</button>
+                <button type="button" onClick={nextStep} disabled={isCheckingDate} className="flex-[2] bg-amberRed text-white py-4 px-6 rounded-xl font-bold shadow-lg hover:bg-darkWood transition-all flex items-center justify-center gap-2">
+                  {isCheckingDate ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                      核對中...
+                    </>
+                  ) : "繼續下一步"}
+                </button>
               ) : (
                 <button type="button" onClick={handleSubmitOrder} disabled={isSubmitting || candyQty < 50} className="flex-[2] bg-emerald-600 text-white py-4 px-6 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-all">確認並送出訂單</button>
               )}
