@@ -1,5 +1,6 @@
 // ==========================================
 // 李伯伯糖葫蘆 - 訂單接收、PDF生成與通知系統
+// (整合 V1.9 婚禮雙代收人 PDF 排版優化 + 每日800支產能限制)
 // ==========================================
 
 // 💡 【設定區】
@@ -14,6 +15,12 @@ const ADMIN_LINE_IDS = [
 
 const SHEET_TAB_NAME = '工作表1';
 const PDF_FOLDER_ID = '1GrWJtbw51RTZ-a0fGkrCqbiLpLgOqxH7';
+
+// 🚀 後台備用登入通關密碼
+const ADMIN_PASSWORD = 'leebobo_admin';
+
+// 🌟 每日產能上限
+const DAILY_LIMIT = 800;
 
 // 🛍️ 產品對照表
 const PRODUCTS = {
@@ -33,6 +40,15 @@ const PRODUCTS = {
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
+
+    // 🚀 備用密碼驗證 API (繞過 LINE)
+    if (data.action === 'verify_password') {
+      if (data.password === ADMIN_PASSWORD) {
+        return ContentService.createTextOutput(JSON.stringify({ 'status': 'success' })).setMimeType(ContentService.MimeType.JSON);
+      } else {
+        return ContentService.createTextOutput(JSON.stringify({ 'status': 'error', 'message': '密碼錯誤' })).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
 
     // 1. 儲存系統設定
     if (data.action === 'save_settings') {
@@ -59,13 +75,14 @@ function doPost(e) {
         const customerMsg = `親愛的顧客您好：\n\n這是「李伯伯糖葫蘆」補發的訂單明細。\n訂單編號：${data.orderNumber}\n\n附件為您的訂單 PDF 檔，請查收。\n\n李伯伯糖葫蘆 敬上`;
         
         MailApp.sendEmail({ to: data.email, subject: `【明細補發】李伯伯糖葫蘆 - 訂單編號 ${data.orderNumber}`, body: customerMsg, attachments: [blob] });
+        
         return ContentService.createTextOutput(JSON.stringify({ 'status': 'success' })).setMimeType(ContentService.MimeType.JSON);
       } catch (err) { 
         return ContentService.createTextOutput(JSON.stringify({ 'status': 'error', 'message': err.toString() })).setMimeType(ContentService.MimeType.JSON);
       }
     }
 
-    // 3. 修改訂單交貨時間與日期 (含改期與自取地點更新)
+    // 3. 修改訂單交貨時間與日期
     if (data.action === 'update_order_time') {
       const lock = LockService.getScriptLock();
       try {
@@ -83,41 +100,40 @@ function doPost(e) {
         }
 
         if (targetRowIndex !== -1) {
-          // 更新日期與時間 (第 10、11 欄)
           sheet.getRange(targetRowIndex, 10).setValue(data.newDate);
           sheet.getRange(targetRowIndex, 11).setValue(data.newTime);
           
-          // 🚀 核心更新：如果前端有傳入 newDetails，則寫入第 12 欄 (specificDetails)
-          let updatedDetails = dataRows[targetRowIndex - 1][11]; // 預設保留原資料
+          let updatedDetails = dataRows[targetRowIndex - 1][11];
           if (data.newDetails !== undefined) {
             updatedDetails = data.newDetails;
             sheet.getRange(targetRowIndex, 12).setValue(updatedDetails);
           }
 
-          // 寫入改期標記 (第 23 欄)
-          sheet.getRange(targetRowIndex, 23).setValue("TRUE");
+          if (data.newNotes !== undefined) {
+            sheet.getRange(targetRowIndex, 19).setValue(data.newNotes);
+          }
 
-          // 重新整理要產成 PDF 的資料物件
-          const rowData = sheet.getRange(targetRowIndex, 1, 1, 22).getValues()[0];
+          sheet.getRange(targetRowIndex, 23).setValue("TRUE");
+          
+          const rowData = sheet.getRange(targetRowIndex, 1, 1, 23).getValues()[0];
           const fullOrderData = {
             orderDate: rowData[0] instanceof Date ? Utilities.formatDate(rowData[0], "GMT+8", "yyyy/MM/dd") : rowData[0],
             orderTime: rowData[1] instanceof Date ? Utilities.formatDate(rowData[1], "GMT+8", "HH:mm:ss") : rowData[1],
             orderNumber: rowData[2], ordererName: rowData[3], ordererPhone: String(rowData[4]).replace(/^'/, ''),
             recipientName: rowData[5], recipientPhone: String(rowData[6]).replace(/^'/, ''), deliveryCity: rowData[7],
             eventType: rowData[8], eventDate: data.newDate, eventTime: data.newTime, 
-            specificDetails: updatedDetails, // 🚀 帶入最新的地點詳細資訊，確保 PDF 一併更新
+            specificDetails: updatedDetails, 
             itemsList: rowData[12], candyTotal: rowData[13], broomRent: rowData[14], broomDeposit: rowData[15],
             shippingFee: rowData[16], totalAmount: rowData[17], notes: rowData[18], ordererEmail: rowData[19],
-            cart: rowData[20] ? JSON.parse(rowData[20]) : {}
+            cart: rowData[20] ? JSON.parse(rowData[20]) : {},
+            isModified: true
           };
-
-          // 刪除舊的 PDF
+          
           const folder = DriveApp.getFolderById(PDF_FOLDER_ID);
           const fileName = `李伯伯糖葫蘆_訂單明細_${data.orderNumber}.pdf`;
           const oldFiles = folder.searchFiles(`title = '${fileName}'`);
           while (oldFiles.hasNext()) { oldFiles.next().setTrashed(true); }
 
-          // 產生並儲存新的 PDF
           const newPdfBlob = generateOrderPdfBlob(fullOrderData);
           const newPdfFile = folder.createFile(newPdfBlob);
           newPdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -144,7 +160,6 @@ function doPost(e) {
         let mainSheet = ss.getSheetByName(SHEET_TAB_NAME) || ss.getSheets()[0];
         const dataRows = mainSheet.getDataRange().getValues();
 
-        // 決定目標月份，預設為上個月
         let targetYYYYMM = data.targetMonth;
         if (!targetYYYYMM) {
           let d = new Date();
@@ -157,10 +172,9 @@ function doPost(e) {
         let flavorCounts = {};
         let matchedOrdersCount = 0;
 
-        // 巡覽資料尋找符合「活動日期(eventDate)」的訂單
         for (let i = 1; i < dataRows.length; i++) {
           let row = dataRows[i];
-          let rDate = row[9]; // 第10欄：活動日期
+          let rDate = row[9]; 
           let rDateStr = "";
           if (rDate instanceof Date) {
             rDateStr = Utilities.formatDate(rDate, "GMT+8", "yyyy-MM");
@@ -170,16 +184,15 @@ function doPost(e) {
 
           if (rDateStr === targetYYYYMM) {
             matchedOrdersCount++;
-            let candySub = Number(row[13]) || 0; // 糖葫蘆小計
-            let bRent = Number(row[14]) || 0;    // 掃帚租金
-            let bDep = Number(row[15]) || 0;     // 掃帚押金
-            let ship = Number(row[16]) || 0;     // 運費
+            let candySub = Number(row[13]) || 0; 
+            let bRent = Number(row[14]) || 0;    
+            let bDep = Number(row[15]) || 0;
+            let ship = Number(row[16]) || 0;
 
             actualRevenue += (candySub + bRent + ship);
             totalDeposit += bDep;
 
-            // 解析商品品項熱銷度
-            let cartStr = row[20]; // 購物車原始資料JSON
+            let cartStr = row[20];
             if (cartStr) {
               try {
                 let cartObj = JSON.parse(cartStr);
@@ -191,7 +204,6 @@ function doPost(e) {
                 }
               } catch(e) {}
             } else {
-              // 備用方案：解析明細字串
               let itemsList = String(row[12] || "");
               let items = itemsList.split('\n');
               items.forEach(item => {
@@ -199,7 +211,7 @@ function doPost(e) {
                   let parts = item.split('x');
                   let fName = parts[0].replace('-', '').trim();
                   let qty = parseInt(parts[1].trim(), 10);
-                  
+         
                   if (fName && !isNaN(qty)) {
                     flavorCounts[fName] = (flavorCounts[fName] || 0) + qty;
                   }
@@ -209,7 +221,6 @@ function doPost(e) {
           }
         }
 
-        // 寫入 Google Sheets 月報表
         let reportSheetName = '月報表';
         let reportSheet = ss.getSheetByName(reportSheetName);
         if (!reportSheet) {
@@ -217,13 +228,11 @@ function doPost(e) {
         }
         
         reportSheet.clear();
-        // 畫出包含「活動營收統計」與「商品品項熱銷排行」的全新表格
         reportSheet.appendRow(['李伯伯糖葫蘆 - 營收報表', '統計月份：' + targetYYYYMM]);
         reportSheet.getRange('A1:B1').setFontWeight('bold').setFontSize(14).setBackground('#FFF2CC');
         reportSheet.getRange('A1:B1').setBorder(true, true, true, true, null, null);
         
         reportSheet.appendRow(['']);
-        
         reportSheet.appendRow(['一、財務摘要 (依活動日認列)', '金額 (NT$)']);
         reportSheet.getRange('A3:B3').setFontWeight('bold').setBackground('#E2EFDA').setBorder(true, true, true, true, null, null);
         
@@ -234,13 +243,11 @@ function doPost(e) {
         reportSheet.getRange('A4:B7').setBorder(true, true, true, true, null, null);
 
         reportSheet.appendRow(['']);
-        
         reportSheet.appendRow(['二、商品熱銷排行', '銷售數量 (支)']);
         reportSheet.getRange('A9:B9').setFontWeight('bold').setBackground('#D9E1F2').setBorder(true, true, true, true, null, null);
         
         let sortedFlavors = Object.keys(flavorCounts).sort((a, b) => flavorCounts[b] - flavorCounts[a]);
         let currentRow = 10;
-        
         for (let i = 0; i < sortedFlavors.length; i++) {
           reportSheet.appendRow([sortedFlavors[i], flavorCounts[sortedFlavors[i]]]);
           currentRow++;
@@ -254,8 +261,7 @@ function doPost(e) {
         }
 
         reportSheet.autoResizeColumns(1, 2);
-
-        // 回傳給 React 前端
+        
         const responseData = {
           targetMonth: targetYYYYMM,
           actualRevenue: actualRevenue,
@@ -263,13 +269,12 @@ function doPost(e) {
           orderCount: matchedOrdersCount,
           flavorStats: sortedFlavors.map(f => ({ name: f, count: flavorCounts[f] }))
         };
-
+        
         return ContentService.createTextOutput(JSON.stringify({ 
           status: 'success', 
           message: '報表產生成功',
           data: responseData 
         })).setMimeType(ContentService.MimeType.JSON);
-
       } catch (err) {
         return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
       } finally {
@@ -277,7 +282,7 @@ function doPost(e) {
       }
     }
 
-    // 🛑 【邏輯安全防護牆】如果帶有 action，且不是新增訂單，在此一律擋下回傳，絕不向下穿透！
+    // 🛑 【邏輯安全防護牆】
     if (data.action && data.action !== 'create_order') {
       return ContentService.createTextOutput(JSON.stringify({ 
         'status': 'error', 
@@ -286,14 +291,34 @@ function doPost(e) {
     }
 
     // ==========================================
-    // 5. 一般新訂單寫入 (當沒有 action，或是 action 為 'create_order' 時才會走到這裡)
+    // 5. 一般新訂單寫入 (第二道防線：寫入前檢查上限)
     // ==========================================
     const lock = LockService.getScriptLock();
     try {
       lock.waitLock(10000); 
       const ss = SpreadsheetApp.getActiveSpreadsheet();
       let sheet = ss.getSheetByName(SHEET_TAB_NAME) || ss.getSheets()[0];
+
+      // 💡 每日產能檢查 (第二道防線)
+      let newOrderCandyQty = 0;
+      const cartObj = data.cart || {};
+      for (let id in cartObj) {
+        if (id !== '5' && cartObj[id] > 0) {
+          newOrderCandyQty += parseInt(cartObj[id], 10);
+        }
+      }
+
+      const requestDateStr = String(data.eventDate).replace(/\//g, '-');
+      const usedQty = getDailyCandyCount(sheet, requestDateStr);
       
+      if (usedQty + newOrderCandyQty > DAILY_LIMIT) {
+        const remaining = Math.max(0, DAILY_LIMIT - usedQty);
+        return ContentService.createTextOutput(JSON.stringify({ 
+          'status': 'error', 
+          'message': `非常抱歉，為堅持手工新鮮製作的品質，我們每日產能上限為 ${DAILY_LIMIT} 支。您選擇的日期目前剩餘可訂購額度為 ${remaining} 支。再麻煩您幫我們微調數量，或選擇其他日期，感謝您的體諒！🍡` 
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+
       if (sheet.getLastRow() === 0) {
         const headers = ["訂單建立日期", "訂單建立時間", "訂購明細單編號", "訂購人", "訂購人電話", "收貨人", "收貨人電話", "配送縣市", "活動類型", "活動日期", "活動時間", "詳細資訊 (餐廳/新人/地點)", "訂購明細", "糖葫蘆小計", "掃帚租金", "掃帚押金", "運費", "總金額", "備註", "聯絡信箱", "購物車原始資料", "PDF下載連結", "是否修改過"];
         sheet.appendRow(headers);
@@ -373,6 +398,19 @@ function doPost(e) {
 // ⚙️ API 入口：處理 GET 請求 (讀取資料)
 // ==========================================
 function doGet(e) {
+  if (e.parameter && e.parameter.action === 'check_availability') {
+    try {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = ss.getSheetByName(SHEET_TAB_NAME) || ss.getSheets()[0];
+      const dateStr = String(e.parameter.date).replace(/\//g, '-');
+      const usedQty = getDailyCandyCount(sheet, dateStr);
+      const remaining = Math.max(0, DAILY_LIMIT - usedQty);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'success', remaining: remaining })).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
   if (e.parameter && e.parameter.action === 'get_settings') {
     const props = PropertiesService.getScriptProperties();
     const enabled = props.getProperty('reminderEnabled') !== 'false'; 
@@ -390,7 +428,6 @@ function doGet(e) {
       const ss = SpreadsheetApp.getActiveSpreadsheet();
       const sheet = ss.getSheetByName(SHEET_TAB_NAME) || ss.getSheets()[0];
       const lastRow = sheet.getLastRow();
-      
       if (lastRow <= 1) return ContentService.createTextOutput(JSON.stringify({ status: 'success', data: [] })).setMimeType(ContentService.MimeType.JSON);
       const dataRows = sheet.getRange(2, 1, lastRow - 1, 23).getValues();
       let orders = [];
@@ -399,14 +436,13 @@ function doGet(e) {
         const r = dataRows[i];
         const safeDate = v => v instanceof Date ? Utilities.formatDate(v, "GMT+8", "yyyy-MM-dd") : v;
         const safeTime = v => v instanceof Date ? Utilities.formatDate(v, "GMT+8", "HH:mm") : v;
-        
         orders.push({
           orderDate: r[0] instanceof Date ? Utilities.formatDate(r[0], "GMT+8", "yyyy/MM/dd") : r[0],
           orderTime: r[1] instanceof Date ? Utilities.formatDate(r[1], "GMT+8", "HH:mm:ss") : r[1],
           orderNumber: r[2], ordererName: r[3], ordererPhone: String(r[4]).replace(/^'/, ''), recipientName: r[5], recipientPhone: String(r[6]).replace(/^'/, ''),
           deliveryCity: r[7], eventType: r[8], eventDate: safeDate(r[9]), eventTime: safeTime(r[10]), specificDetails: r[11], itemsList: r[12],
           candySubtotal: r[13] || 0, broomRent: r[14] || 0, broomDeposit: r[15] || 0, shippingFee: r[16] || 0, totalPrice: r[17] || 0,
-          notes: r[18] || '', ordererEmail: r[19] || '', cart: r[20] ? JSON.parse(r[20]) : {}, pdfUrl: r[21] || '',
+          notes: r[18] || '', ordererEmail: r[19] || '', cart: r[20] ? JSON.parse(r[20]) : {}, pdfDownloadUrl: r[21] || '',
           isModified: r[22] === "TRUE" || r[22] === true
         });
       }
@@ -423,7 +459,6 @@ function doGet(e) {
       const sheet = ss.getSheetByName(SHEET_TAB_NAME) || ss.getSheets()[0];
       const lastRow = sheet.getLastRow();
       if (lastRow <= 1) return ContentService.createTextOutput(JSON.stringify({ status: 'not_found' })).setMimeType(ContentService.MimeType.JSON);
-      
       const dataRows = sheet.getRange(2, 1, lastRow - 1, 23).getValues();
       const cleanStr = str => String(str).replace(/[\s\-\'\"\/\\]/g, '');
       const formatDate = val => {
@@ -432,19 +467,21 @@ function doGet(e) {
       };
       
       const qName = cleanStr(e.parameter.name); const qPhone = cleanStr(e.parameter.phone); const qDate = formatDate(e.parameter.date);
+     
       let matches = []; 
     
       for (let i = dataRows.length - 1; i >= 0; i--) {
         const r = dataRows[i]; const rName = cleanStr(r[3]); const rPhone = cleanStr(r[4]); const rDate = formatDate(r[9]);
         if (rName === qName && rPhone === qPhone && rDate === qDate) {
           const safeDate = val => val instanceof Date ? Utilities.formatDate(val, "GMT+8", "yyyy-MM-dd") : val; 
+       
           const safeTime = val => val instanceof Date ? Utilities.formatDate(val, "GMT+8", "HH:mm") : val;
-          
           matches.push({
             orderDate: r[0] instanceof Date ? Utilities.formatDate(r[0], "GMT+8", "yyyy/MM/dd") : r[0], 
             orderTime: r[1] instanceof Date ? Utilities.formatDate(r[1], "GMT+8", "HH:mm:ss") : r[1], 
             orderNumber: r[2], ordererName: r[3], ordererPhone: String(r[4]).replace(/^'/, ''), recipientName: r[5], recipientPhone: String(r[6]).replace(/^'/, ''),
             deliveryCity: r[7], eventType: r[8], eventDate: safeDate(r[9]), eventTime: safeTime(r[10]), specificDetails: r[11], itemsList: r[12],
+          
             candySubtotal: r[13] || 0, broomRent: r[14] || 0, broomDeposit: r[15] || 0, shippingFee: r[16] || 0, totalPrice: r[17] || 0, 
             notes: r[18] || '', ordererEmail: r[19] || '', cart: r[20] ? JSON.parse(r[20]) : {}, pdfDownloadUrl: r[21] || '',
             isModified: r[22] === "TRUE" || r[22] === true
@@ -538,7 +575,6 @@ function sendDailyReminder() {
            }
         }
       });
-      
       for (let id in itemCounts) {
          if (PRODUCTS[id]) { 
            message += `${PRODUCTS[id].name}：${itemCounts[id]} 支\n`;
@@ -561,7 +597,8 @@ function sendDailyReminder() {
     const props = PropertiesService.getScriptProperties();
     const enabled = props.getProperty('reminderEnabled') !== 'false';
     const timeStr = props.getProperty('reminderTime') || '11:00';
-    if (enabled) { manageReminderTrigger(true, timeStr); }
+    if (enabled) { manageReminderTrigger(true, timeStr);
+    }
   }
 }
 
@@ -573,7 +610,6 @@ function generateOrderPdfBlob(data) {
   let itemsHtml = '';
   let candyQty = 0;
   let broomQty = 0;
-  
   for (let id in cart) {
     if (cart[id] > 0 && id !== '5') {
       const product = PRODUCTS[id];
@@ -612,9 +648,23 @@ function generateOrderPdfBlob(data) {
     if (groomLine) groomInfo = groomLine.replace('新人：', '');
   }
 
+  // 💡 婚禮雙代收人拆解邏輯
+  const isWedding = data.eventType === '浪漫婚禮 / 喜宴';
+  const names = data.recipientName ? data.recipientName.split(' / ') : [];
+  const phones = data.recipientPhone ? data.recipientPhone.split(' / ') : [];
+
+  let recipientHtml = '';
+  if (isWedding) {
+    recipientHtml = `
+      <tr><td class="label">收貨人 1</td><td class="value">${names[0] || '未提供'} <span style="font-size:12px; color:#666;">(${phones[0] || '未提供'})</span></td></tr>
+      <tr><td class="label">收貨人 2</td><td class="value">${names[1] || '未提供'} <span style="font-size:12px; color:#666;">(${phones[1] || '未提供'})</span></td></tr>
+    `;
+  } else {
+    recipientHtml = `<tr><td class="label">${isLocked ? '取貨人' : '收貨人'}</td><td class="value">${data.recipientName || '未提供'} <span style="font-size:12px; color:#666;">(${data.recipientPhone || '未提供'})</span></td></tr>`;
+  }
+
   const notesHtml = data.notes ? data.notes.replace(/\n/g, '<br/>') : '無';
   const displayTime = data.orderTime ? data.orderTime.split(':').slice(0, 2).join(':') : '';
-  
   const htmlTemplate = `
     <!DOCTYPE html>
     <html>
@@ -635,7 +685,6 @@ function generateOrderPdfBlob(data) {
     </head>
     <body>
       <div class="container">
-        
         <div class="header">
           <h2 class="title">李伯伯糖葫蘆</h2>
           <div style="font-size: 16px; font-weight: bold; color: #3E2723; margin-bottom: 8px;">訂購單編號 ： ${data.orderNumber}</div>
@@ -647,7 +696,6 @@ function generateOrderPdfBlob(data) {
           <tr><td class="label">活動類型</td><td class="value">${data.eventType}</td></tr>
           <tr><td class="label">活動日期</td><td class="value">${data.eventDate || '未填寫'}</td></tr>
           <tr><td class="label">收貨時間</td><td class="value">${isLocked ? '配合商家時間地點自取' : (data.eventTime || '未填寫')}</td></tr>
-          
           ${!isLocked && locationName ? `<tr><td class="label">地點名稱</td><td class="value">${locationName}</td></tr>` : ''}
           <tr><td class="label">配送地址</td><td class="value">${fullAddress}</td></tr>
         </table>
@@ -656,7 +704,7 @@ function generateOrderPdfBlob(data) {
         <table class="info-table">
           <tr><td class="label">訂購人</td><td class="value">${data.ordererName} <span style="font-size:12px; color:#666;">(${data.ordererPhone})</span></td></tr>
           ${data.ordererEmail ? `<tr><td class="label">電子信箱</td><td class="value">${data.ordererEmail}</td></tr>` : ''}
-          <tr><td class="label">收貨人</td><td class="value">${data.recipientName} <span style="font-size:12px; color:#666;">(${data.recipientPhone})</span></td></tr>
+          ${recipientHtml}
           ${groomInfo && groomInfo !== '未提供' ? `<tr><td class="label">新人資訊</td><td class="value">${groomInfo}</td></tr>` : ''}
           ${data.notes ? `<tr><td class="label">備註</td><td class="value" style="line-height: 1.5;">${notesHtml}</td></tr>` : ''}
         </table>
@@ -710,7 +758,6 @@ function generateOrderPdfBlob(data) {
              </tr>
            </table>
         </div>
-        
       </div>
     </body>
     </html>
@@ -721,21 +768,42 @@ function generateOrderPdfBlob(data) {
   return blob;
 }
 
+// 💡 錯誤捕捉防護罩的 LINE 通知函式
 function sendLineOfficialMessage(text) {
-  const messageText = text ? String(text).trim() : "⚠️ 您在後台手動執行了測試，系統運作正常。";
+  const messageText = text ? String(text).trim() : "⚠️ 系統測試正常。";
   if (!messageText) return;
+
   const url = 'https://api.line.me/v2/bot/message/push';
   const payload = { 
     to: LINE_ADMIN_USER_ID, 
     messages: [{ type: 'text', text: messageText }] 
   };
+
   const options = { 
     method: 'post', 
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN }, 
-    payload: JSON.stringify(payload) 
+    headers: { 
+      'Content-Type': 'application/json', 
+      'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN 
+    }, 
+    payload: JSON.stringify(payload),
+    // 💡 關鍵：即使 API 出錯也不要中斷整個 GAS 執行
+    muteHttpExceptions: true 
   };
  
-  UrlFetchApp.fetch(url, options);
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    
+    // 如果是 429，代表額度滿了，我們記錄在 GAS 日誌但不要報錯給使用者
+    if (responseCode === 429) {
+      Logger.log("⚠️ LINE 訊息發送失敗：本月免費額度已達上限。");
+    } else if (responseCode !== 200) {
+      Logger.log("❌ LINE API 發生其他錯誤，代碼：" + responseCode);
+    }
+  } catch (e) {
+    // 即使連線完全失敗，也只記錄 Log，不拋出錯誤
+    Logger.log("🚨 LINE 連線異常：" + e.toString());
+  }
 }
 
 /**
@@ -790,7 +858,6 @@ function autoArchiveOldOrdersByYear() {
   // 3. 執行搬移動作：按年份寫入對應的工作表
   for (const sheetName in archiveGroups) {
     let targetSheet = ss.getSheetByName(sheetName);
-    
     // 如果該年份的工作表還沒建立，則自動建立並設定標題
     if (!targetSheet) {
       targetSheet = ss.insertSheet(sheetName);
@@ -809,7 +876,6 @@ function autoArchiveOldOrdersByYear() {
   // 4. 清理並更新主工作表 (保留一年內的活資料)
   // 先清空原本所有資料列 (第 2 列以後)
   sourceSheet.getRange(2, 1, sourceSheet.getLastRow(), sourceSheet.getLastColumn()).clearContent();
-  
   if (rowsToKeep.length > 0) {
     // 將保留下來的一年內資料重新寫回
     sourceSheet.getRange(2, 1, rowsToKeep.length, rowsToKeep[0].length).setValues(rowsToKeep);
@@ -817,4 +883,37 @@ function autoArchiveOldOrdersByYear() {
   } else {
     Logger.log("✨ 主工作表已清空，所有歷史訂單皆已封存完畢。");
   }
+}
+
+// ==========================================
+// 📊 內部輔助函式：計算指定日期的已訂購糖葫蘆總數
+// ==========================================
+function getDailyCandyCount(sheet, targetDateStr) {
+  const dataRows = sheet.getDataRange().getValues();
+  let totalCandies = 0;
+  
+  for (let i = 1; i < dataRows.length; i++) {
+    let rDate = dataRows[i][9]; // 第10欄：活動日期
+    let rDateStr = "";
+    if (rDate instanceof Date) {
+      rDateStr = Utilities.formatDate(rDate, "GMT+8", "yyyy-MM-dd");
+    } else if (rDate) {
+      rDateStr = String(rDate).replace(/\//g, '-');
+    }
+
+    if (rDateStr === targetDateStr) {
+      let cartStr = dataRows[i][20]; // 第21欄：購物車原始資料
+      if (cartStr) {
+        try {
+          let cartObj = JSON.parse(cartStr);
+          for (let id in cartObj) {
+            if (id !== '5' && cartObj[id] > 0) {
+              totalCandies += parseInt(cartObj[id], 10);
+            }
+          }
+        } catch(e) {}
+      }
+    }
+  }
+  return totalCandies;
 }

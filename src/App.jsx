@@ -41,14 +41,11 @@ function AppContent() {
       console.log('偵測到 LIFF 重導向，準備跳轉至:', liffStatePath);
       
       // ⚠️ 關鍵修正：必須保留 LINE 傳回來的 code 和 state 參數
-      // 否則 liff.init() 會因為找不到憑證而判定為「未登入」
-      params.delete('liff.state'); // 移除 liff.state 避免跳轉死迴圈
+      params.delete('liff.state'); 
       const remainingParams = params.toString();
       
-      // 重組網址：目標路徑 + 剩下的參數 (例如: /admin?code=xxx&state=xxx)
       const destination = liffStatePath + (remainingParams ? `?${remainingParams}` : '');
       
-      // 執行跳轉並將參數帶過去
       navigate(destination, { replace: true });
     }
   }, [location.search, navigate]);
@@ -94,12 +91,22 @@ function AppContent() {
 
   const getCartTotalItems = () => {
     return Object.entries(cart).reduce((sum, [id, qty]) => {
+      // 排除掃帚組件的計算，只算糖葫蘆總數
       return parseInt(id) !== 5 ? sum + qty : sum;
     }, 0);
   };
 
   const cartCount = getCartTotalItems();
   const displayCount = cartCount > 99 ? '99+' : cartCount;
+
+  // 💡 顧問新增：導覽列購物車圖示的防呆檢查
+  const handleCartClick = () => {
+    if (cartCount === 0) {
+      setAlertMsg("您的購物車目前是空的，請先挑選喜歡的糖葫蘆喔！🍡");
+      return;
+    }
+    handleNavigate('/order');
+  };
 
   // --- 訂單與路由跳轉邏輯 ---
   const handleOrderSuccess = (orderData) => {
@@ -116,11 +123,10 @@ function AppContent() {
     setIsMobileMenuOpen(false); 
   };
 
-  // 🚀 判斷當前是否為後台模式
   const isAdminRoute = location.pathname.startsWith('/admin');
 
   // ==========================================
-  // 後台專屬畫面渲染：不顯示前台 Navbar 與 Footer
+  // 後台專屬畫面渲染
   // ==========================================
   if (isAdminRoute) {
     return (
@@ -155,7 +161,8 @@ function AppContent() {
                 <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/contact'); }} className={`transition-colors duration-300 ${location.pathname === '/contact' ? 'text-amberRed font-bold' : 'hover:text-amberRed'}`}>聯絡我們</a>
                 
                 {['/list', '/order'].includes(location.pathname) && (
-                    <button onClick={() => handleNavigate('/order')} className="relative flex items-center justify-center w-11 h-11 rounded-full bg-amberRed text-white shadow-md hover:bg-pureWhite hover:text-amberRed transition-all ml-4 animate-bounce">
+                    /* 💡 修正：將跳轉邏輯改為 handleCartClick 進行攔截檢查 */
+                    <button onClick={handleCartClick} className="relative flex items-center justify-center w-11 h-11 rounded-full bg-amberRed text-white shadow-md hover:bg-pureWhite hover:text-amberRed transition-all ml-4 animate-bounce">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
                         {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pureWhite text-amberRed text-[10px] font-bold rounded-full h-5 min-w-[20px] px-1 flex items-center justify-center shadow-md border-2 border-amberRed">{displayCount}</span>}
                     </button>
@@ -164,7 +171,8 @@ function AppContent() {
 
             <div className="md:hidden flex items-center space-x-3">
                 {['/list', '/order'].includes(location.pathname) && (
-                    <button onClick={() => handleNavigate('/order')} className="relative flex items-center justify-center w-10 h-10 rounded-full bg-amberRed text-white shadow-md hover:bg-pureWhite hover:text-amberRed transition-all animate-bounce">
+                    /* 💡 修正：手機版同步套用 handleCartClick */
+                    <button onClick={handleCartClick} className="relative flex items-center justify-center w-10 h-10 rounded-full bg-amberRed text-white shadow-md hover:bg-pureWhite hover:text-amberRed transition-all animate-bounce">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
                         {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pureWhite text-amberRed text-[10px] font-bold rounded-full h-5 min-w-[20px] px-1 flex items-center justify-center shadow-md border-2 border-amberRed">{displayCount}</span>}
                     </button>
@@ -214,7 +222,8 @@ function AppContent() {
           <Route path="/" element={<BrandStory navigateTo={handleNavigate} />} />
           <Route path="/process" element={<OrderProcess navigateTo={handleNavigate} />} />
           <Route path="/contact" element={<ContactUs />} />
-          <Route path="/list" element={<ProductList cart={cart} updateCart={updateCart} handleQuantityChange={handleQuantityChange} navigateTo={handleNavigate} />} />
+          {/* 💡 修正：傳入 setAlertMsg 給 ProductList */}
+          <Route path="/list" element={<ProductList cart={cart} updateCart={updateCart} handleQuantityChange={handleQuantityChange} navigateTo={handleNavigate} setAlertMsg={setAlertMsg} />} />
           <Route path="/order" element={<Checkout cart={cart} updateCart={updateCart} handleQuantityChange={handleQuantityChange} navigateTo={handleNavigate} onOrderSuccess={handleOrderSuccess} setAlertMsg={setAlertMsg} />} />
           <Route path="/success" element={<OrderSuccess submittedOrder={submittedOrder} navigateTo={handleNavigate} />} />
           <Route path="/inquiry" element={<OrderInquiry setAlertMsg={setAlertMsg} />} />

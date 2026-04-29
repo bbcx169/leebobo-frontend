@@ -18,18 +18,18 @@ const Checkout = ({
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({ ...initialFormData });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCheckingDate, setIsCheckingDate] = useState(false); // 💡 新增：檢查產能中的狀態
+  const [isCheckingDate, setIsCheckingDate] = useState(false);
   const [isSameAsOrderer, setIsSameAsOrderer] = useState(false);
 
   useEffect(() => {
-    if (isSameAsOrderer) {
+    if (isSameAsOrderer && formData.eventType !== 'wedding') {
       setFormData(prev => ({
         ...prev,
         recipientName: prev.ordererName,
         recipientPhone: prev.ordererPhone
       }));
     }
-  }, [isSameAsOrderer, formData.ordererName, formData.ordererPhone]);
+  }, [isSameAsOrderer, formData.ordererName, formData.ordererPhone, formData.eventType]);
 
   useEffect(() => {
     // 當切換為自取時，清空不相關的配送資訊
@@ -42,7 +42,11 @@ const Checkout = ({
         generalLocation: ''
       }));
     }
-  }, [formData.deliveryCity]);
+    // 若切換活動類型，且勾選了同訂購人，將其取消勾選（婚禮不適用同訂購人）
+    if (formData.eventType === 'wedding') {
+      setIsSameAsOrderer(false);
+    }
+  }, [formData.deliveryCity, formData.eventType]);
 
   const broomQty = cart[5] || 0; 
   const candyQty = Object.entries(cart).reduce((sum, [id, qty]) => parseInt(id) !== 5 ? sum + qty : sum, 0);
@@ -71,7 +75,7 @@ const Checkout = ({
 
   const handleFormChange = (e) => {
     let { name, value } = e.target;
-    if (name === 'ordererPhone' || name === 'recipientPhone') {
+    if (name === 'ordererPhone' || name === 'recipientPhone' || name === 'recipientPhone2') {
       value = value.replace(/\D/g, ''); 
     }
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -112,11 +116,18 @@ const Checkout = ({
         return; 
       }
 
-      if (candyQty > 0 && candyQty < 50) {
-        setAlertMsg(`總訂購量最低需達 50 支，目前僅 ${candyQty} 支。`); return;
+      // 💡 修正邏輯：嚴格阻擋購物車為 0 以及未滿 50 支的情況
+      if (candyQty === 0) {
+        setAlertMsg("購物車目前是空的，請先選購商品！（最低起訂量為 50 支）"); 
+        return;
       }
 
-      // 💡 第一道防線：呼叫 GAS 檢查該日期的剩餘產能
+      if (candyQty < 50) {
+        setAlertMsg(`總訂購量最低需達 50 支，目前僅 ${candyQty} 支。`); 
+        return;
+      }
+
+      // 當購物車大於等於 50 支且日期正確後，才呼叫 API 檢查每日產能
       setIsCheckingDate(true);
       try {
         const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzf8kJ6Ka8yGabg--MCRJ8eyucBbsGRDbceGEeH-CQDLqOMXhTCysZVrPKL0MLpSg4L/exec';
@@ -127,12 +138,11 @@ const Checkout = ({
           const remaining = result.remaining;
           if (candyQty > remaining) {
             setAlertMsg(`非常抱歉，為堅持手工新鮮製作的品質，我們每日產能上限為 800 支。您選擇的日期目前剩餘可訂購額度為 ${remaining} 支。再麻煩您幫我們微調數量，或選擇其他日期，感謝您的體諒！🍡`);
-            return; // 擋住，不進入下一步
+            return; 
           }
         }
       } catch (error) {
         console.error("產能檢查失敗:", error);
-        // 若 API 異常，可選擇擋下或放行（交由第二道防線處理）。這裡為了保險起見提示使用者。
         setAlertMsg("系統暫時無法核對產能額度，請檢查網路連線或稍後再試。");
         return;
       } finally {
@@ -154,16 +164,26 @@ const Checkout = ({
     }
 
     if (currentStep === 3) {
-      if (!formData.ordererName || !formData.ordererPhone || !formData.recipientName || !formData.recipientPhone) {
-        setAlertMsg("請完整填寫聯絡資訊。"); return;
-      }
-      
       const phoneRegex = /^[0-9]{10}$/;
+      
+      if (formData.eventType === 'wedding') {
+        if (!formData.ordererName || !formData.ordererPhone || !formData.recipientName || !formData.recipientPhone || !formData.recipientName2 || !formData.recipientPhone2) {
+          setAlertMsg("請完整填寫聯絡人與兩位現場代收親友的資訊。"); return;
+        }
+        if (!phoneRegex.test(formData.recipientPhone) || !phoneRegex.test(formData.recipientPhone2)) {
+          setAlertMsg("代收人手機號碼格式錯誤，請輸入完整的 10 位數字。"); return;
+        }
+      } else {
+        if (!formData.ordererName || !formData.ordererPhone || !formData.recipientName || !formData.recipientPhone) {
+          setAlertMsg("請完整填寫聯絡資訊。"); return;
+        }
+        if (!phoneRegex.test(formData.recipientPhone)) {
+          setAlertMsg("收貨人聯絡電話格式錯誤，請輸入完整的 10 位數字。"); return;
+        }
+      }
+
       if (!phoneRegex.test(formData.ordererPhone)) {
         setAlertMsg("訂購人手機號碼格式錯誤，請輸入完整的 10 位數字。"); return;
-      }
-      if (!phoneRegex.test(formData.recipientPhone)) {
-        setAlertMsg("收貨人聯絡電話格式錯誤，請輸入完整的 10 位數字。"); return;
       }
 
       if (formData.ordererEmail) {
@@ -191,12 +211,22 @@ const Checkout = ({
     const finalEventTime = isLocked ? '需配合商家時間地點自取' : (formData.weddingTime || formData.generalTime || '未提供');
     const specificDetails = isLocked ? `取貨地址：${fullAddress}` : `地點：${locationText || '未提供'}\n地址：${fullAddress}`;
 
+    const finalRecipientName = formData.eventType === 'wedding' 
+        ? `${formData.recipientName} / ${formData.recipientName2}` 
+        : formData.recipientName;
+    const finalRecipientPhone = formData.eventType === 'wedding' 
+        ? `${formData.recipientPhone} / ${formData.recipientPhone2}` 
+        : formData.recipientPhone;
+
     const payload = { 
         orderDate: new Date().toLocaleDateString('zh-TW'),
         orderTime: new Date().toLocaleTimeString('zh-TW', { hour12: false }),
         orderNumber: `${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
-        ordererName: formData.ordererName, ordererPhone: formData.ordererPhone, ordererEmail: formData.ordererEmail || '未提供',
-        recipientName: formData.recipientName, recipientPhone: formData.recipientPhone,
+        ordererName: formData.ordererName, 
+        ordererPhone: formData.ordererPhone, 
+        ordererEmail: formData.ordererEmail || '未提供',
+        recipientName: finalRecipientName, 
+        recipientPhone: finalRecipientPhone,
         deliveryCity: currentCityName,
         eventType: formData.eventType === 'wedding' ? '浪漫婚禮 / 喜宴' : (formData.eventType === 'school' ? '校園活動 / 園遊會' : '其他'),
         eventDate: formData.weddingDate || formData.generalDate || '未提供', 
@@ -215,7 +245,6 @@ const Checkout = ({
         onOrderSuccess({ payload, orderNumber: payload.orderNumber, cart: { ...cart }, candyQty, broomQty, candySubtotal, broomRent, broomDeposit, shippingFee, totalPrice, pdfDownloadUrl: result.pdfDownloadUrl }); 
       }
       else { 
-        // 💡 這裡會接收並顯示第二道防線擋下的「產能已滿」訊息
         setAlertMsg(result.message); 
       }
     } catch (error) { 
@@ -319,9 +348,15 @@ const Checkout = ({
                   {isLocked ? (
                     <input type="text" disabled value="需配合商家時間地點自取" className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-gray-100 text-gray-500" />
                   ) : (
-                    <div className="flex items-stretch w-full rounded-xl border border-warmWood/30 overflow-hidden bg-pureWhite">
-                      <div className="bg-gray-50 text-gray-600 px-4 py-3 border-r border-warmWood/30 font-bold flex items-center shrink-0">{currentCityName}</div>
-                      <input type="text" name={formData.eventType === 'wedding' ? 'weddingAddress' : 'generalAddress'} required placeholder="例：信義區OO路123號" value={formData.eventType === 'wedding' ? formData.weddingAddress : formData.generalAddress} onChange={handleFormChange} className="w-full px-4 py-3 outline-none bg-transparent" />
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-stretch w-full rounded-xl border border-warmWood/30 overflow-hidden bg-pureWhite">
+                        <div className="bg-gray-50 text-gray-600 px-4 py-3 border-r border-warmWood/30 font-bold flex items-center shrink-0">{currentCityName}</div>
+                        <input type="text" name={formData.eventType === 'wedding' ? 'weddingAddress' : 'generalAddress'} required placeholder="例：信義區OO路123號" value={formData.eventType === 'wedding' ? formData.weddingAddress : formData.generalAddress} onChange={handleFormChange} className="w-full px-4 py-3 outline-none bg-transparent" />
+                      </div>
+                      {/* 💡 顧問修正：針對配送範圍的溫馨提示，確保完整呈現！ */}
+                      <p className="text-xs text-amberRed font-medium leading-relaxed pl-1">
+                        💡 溫馨提醒：因專車配送行程緊湊與人力限制，<span className="font-bold underline">司機無法協助送上樓或送入會場內</span>。屆時需勞煩您安排親友至一樓大門口或會場外與司機面交取貨，感謝您的體諒與配合！
+                      </p>
                     </div>
                   )}
                 </div>
@@ -333,6 +368,7 @@ const Checkout = ({
             {currentStep === 3 && (
               <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
                 <h2 className="text-2xl font-bold text-darkWood mb-6 font-serif flex items-center gap-2"><span className="bg-amberRed/10 p-2 rounded-lg text-amberRed">03</span> 聯絡資訊</h2>
+                
                 <div className="p-5 bg-creamBg/50 rounded-xl border border-warmWood/20 space-y-4">
                   <p className="font-bold text-amberRed text-sm">訂購人*</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -346,16 +382,41 @@ const Checkout = ({
                   </div>
                 </div>
 
-                <div className="p-5 bg-pureWhite rounded-xl border border-warmWood/20 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <p className="font-bold text-darkWood text-sm">{isLocked ? '取貨人*' : '收貨人*'}</p>
-                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-600"><input type="checkbox" checked={isSameAsOrderer} onChange={(e) => setIsSameAsOrderer(e.target.checked)} className="w-4 h-4" /> ☑️ 同訂購人</label>
+                {/* 💡 根據活動類型切換收貨人 UI */}
+                {formData.eventType === 'wedding' ? (
+                  <div className="p-5 bg-pureWhite rounded-xl border border-warmWood/20 space-y-5">
+                    <div className="bg-amberRed/10 border border-amberRed/20 p-4 rounded-xl text-sm text-amberRed font-medium leading-relaxed">
+                      💡 婚宴當日新人行程緊湊且環境嘈雜，常有漏接電話之情事。為確保糖葫蘆順利送達，請提供<span className="font-bold underline decoration-2 underline-offset-2">兩位現場代收親友</span>（如：伴郎、總召或工作人員）的聯絡資訊，讓您能安心享受專屬於您的美好時刻。🍡
+                    </div>
+                    
+                    <div>
+                      <p className="font-bold text-darkWood text-sm border-b border-warmWood/20 pb-2 mb-3">收貨人 1 (現場代收親友)*</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" name="recipientName" required placeholder="姓名 *" value={formData.recipientName || ''} onChange={handleFormChange} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-gray-50 focus:bg-white outline-none" />
+                        <input type="tel" name="recipientPhone" required maxLength="10" inputMode="numeric" placeholder="聯絡手機(10位數字)*" value={formData.recipientPhone || ''} onChange={handleFormChange} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-gray-50 focus:bg-white outline-none" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="font-bold text-darkWood text-sm border-b border-warmWood/20 pb-2 mb-3">收貨人 2 (現場代收親友)*</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" name="recipientName2" required placeholder="姓名 *" value={formData.recipientName2 || ''} onChange={handleFormChange} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-gray-50 focus:bg-white outline-none" />
+                        <input type="tel" name="recipientPhone2" required maxLength="10" inputMode="numeric" placeholder="聯絡手機(10位數字)*" value={formData.recipientPhone2 || ''} onChange={handleFormChange} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-gray-50 focus:bg-white outline-none" />
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" name="recipientName" required placeholder="姓名 *" value={formData.recipientName} onChange={handleFormChange} disabled={isSameAsOrderer} className={`w-full px-4 py-3 rounded-xl border border-warmWood/30 ${isSameAsOrderer ? 'bg-gray-50' : 'bg-pureWhite'}`} />
-                    <input type="tel" name="recipientPhone" required maxLength="10" inputMode="numeric" placeholder="聯絡手機(10位數字)*" value={formData.recipientPhone} onChange={handleFormChange} disabled={isSameAsOrderer} className={`w-full px-4 py-3 rounded-xl border border-warmWood/30 ${isSameAsOrderer ? 'bg-gray-50' : 'bg-pureWhite'}`} />
+                ) : (
+                  <div className="p-5 bg-pureWhite rounded-xl border border-warmWood/20 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <p className="font-bold text-darkWood text-sm">{isLocked ? '取貨人*' : '收貨人*'}</p>
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-600"><input type="checkbox" checked={isSameAsOrderer} onChange={(e) => setIsSameAsOrderer(e.target.checked)} className="w-4 h-4" /> ☑️ 同訂購人</label>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <input type="text" name="recipientName" required placeholder="姓名 *" value={formData.recipientName} onChange={handleFormChange} disabled={isSameAsOrderer} className={`w-full px-4 py-3 rounded-xl border border-warmWood/30 ${isSameAsOrderer ? 'bg-gray-50' : 'bg-pureWhite'}`} />
+                      <input type="tel" name="recipientPhone" required maxLength="10" inputMode="numeric" placeholder="聯絡手機(10位數字)*" value={formData.recipientPhone} onChange={handleFormChange} disabled={isSameAsOrderer} className={`w-full px-4 py-3 rounded-xl border border-warmWood/30 ${isSameAsOrderer ? 'bg-gray-50' : 'bg-pureWhite'}`} />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -389,7 +450,17 @@ const Checkout = ({
                     <div className="grid grid-cols-[80px_1fr] gap-y-2">
                       {renderDetailRow('訂購人', `${formData.ordererName || '未提供'} (${formData.ordererPhone || '未提供'})`)}
                       {renderDetailRow('電子信箱', formData.ordererEmail)}
-                      {renderDetailRow(isLocked ? '取貨人' : '收貨人', `${formData.recipientName || '未提供'} (${formData.recipientPhone || '未提供'})`)}
+                      
+                      {/* 💡 預覽畫面：依照婚禮拆分顯示 */}
+                      {formData.eventType === 'wedding' ? (
+                        <>
+                          {renderDetailRow('收貨人 1', `${formData.recipientName || '未提供'} (${formData.recipientPhone || '未提供'})`)}
+                          {renderDetailRow('收貨人 2', `${formData.recipientName2 || '未提供'} (${formData.recipientPhone2 || '未提供'})`)}
+                        </>
+                      ) : (
+                        renderDetailRow(isLocked ? '取貨人' : '收貨人', `${formData.recipientName || '未提供'} (${formData.recipientPhone || '未提供'})`)
+                      )}
+                      
                       {renderDetailRow('備註', formData.notes)}
                     </div>
                   </div>

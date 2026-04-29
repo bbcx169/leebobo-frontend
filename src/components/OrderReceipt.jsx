@@ -22,10 +22,10 @@ const OrderReceipt = ({ order, products }) => {
   // 處理時間格式：將 HH:mm:ss 轉換為 HH:mm (不顯示秒數)
   const displayTime = p.orderTime ? p.orderTime.split(':').slice(0, 2).join(':') : '';
 
-  // 判斷是否為自取 (與 Checkout 邏輯一致)
-  const isLocked = p.deliveryCity === '自取';
+  // 判斷是否為自取
+  const isLocked = p.deliveryCity === '自取' || p.deliveryCity === 'pickup';
 
-  // 💡 顧問優化：統一處理「未提供」顯示的工具函數，確保 UI 一致性
+  // 💡 顧問優化：統一處理「未提供」顯示的工具函數
   const renderDetailRow = (label, value) => (
     <React.Fragment>
       <span className="text-darkWood/60 font-medium">{label}</span>
@@ -35,25 +35,26 @@ const OrderReceipt = ({ order, products }) => {
     </React.Fragment>
   );
 
-  // 💡 智慧解析：從 specificDetails 中提取出欄位，還原 Checkout 的排版
+  // 💡 智慧解析地址與地點
   let detailAddress = '';
   let locationText = '';
 
   if (p.specificDetails) {
     const lines = p.specificDetails.split('\n');
-    
-    // 找尋地址 (含自取與配送標籤)
     const addrLine = lines.find(l => l.startsWith('地址：') || l.startsWith('取貨地址：'));
     if (addrLine) {
         detailAddress = addrLine.replace(/^(地址：|取貨地址：)/, '').trim();
     }
-    
-    // 找尋地點名稱
     const locLine = lines.find(l => l.startsWith('地點：'));
     if (locLine) {
         locationText = locLine.replace('地點：', '').trim();
     }
   }
+
+  // 💡 雙代收人拆解邏輯
+  const isWedding = p.eventType === '浪漫婚禮 / 喜宴';
+  const names = p.recipientName ? p.recipientName.split(' / ') : [];
+  const phones = p.recipientPhone ? p.recipientPhone.split(' / ') : [];
 
   return (
     <div className="bg-white p-6 md:p-8 rounded-2xl border border-warmWood/30 shadow-sm space-y-6 text-sm animate-[fadeIn_0.5s_ease-out]">
@@ -73,7 +74,7 @@ const OrderReceipt = ({ order, products }) => {
         </div>
       </div>
 
-      {/* 區塊 1：活動資訊 (完美比照 Checkout 排序) */}
+      {/* 區塊 1：活動資訊 */}
       <div className="space-y-3">
         <h3 className="text-base font-bold text-amberRed border-b border-warmWood/20 pb-2 flex items-center gap-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -87,13 +88,11 @@ const OrderReceipt = ({ order, products }) => {
           
           {isLocked ? (
             <>
-              {/* 自取模式：時間與地址自動帶入提示文字 */}
               {renderDetailRow('取貨時間', '需配合商家時間地點自取')}
               {renderDetailRow('取貨地址', '需配合商家時間地點自取')}
             </>
           ) : (
             <>
-              {/* 配送模式：依序顯示收貨時間、地點、地址 */}
               {renderDetailRow('收貨時間', p.eventTime)}
               {renderDetailRow('地點名稱', locationText)}
               {renderDetailRow('配送地址', detailAddress)}
@@ -102,7 +101,7 @@ const OrderReceipt = ({ order, products }) => {
         </div>
       </div>
 
-      {/* 區塊 2：聯絡資訊 (合併姓名與手機格式) */}
+      {/* 區塊 2：聯絡資訊 */}
       <div className="space-y-3 pt-2">
         <h3 className="text-base font-bold text-amberRed border-b border-warmWood/20 pb-2 flex items-center gap-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,10 +110,19 @@ const OrderReceipt = ({ order, products }) => {
           聯絡資訊
         </h3>
         <div className="grid grid-cols-[80px_1fr] gap-y-2">
-          {renderDetailRow('訂購人', `${p.ordererName || '未提供'}(${p.ordererPhone || '未提供'})`)}
+          {renderDetailRow('訂購人', `${p.ordererName || '未提供'} (${p.ordererPhone || '未提供'})`)}
           {renderDetailRow('電子信箱', p.ordererEmail)}
-          {/* 根據模式切換 標籤文字 */}
-          {renderDetailRow(isLocked ? '取貨人' : '收貨人', `${p.recipientName || '未提供'}(${p.recipientPhone || '未提供'})`)}
+          
+          {/* 💡 根據模式切換收貨人顯示 */}
+          {isWedding ? (
+            <>
+              {renderDetailRow('收貨人 1', names[0] ? `${names[0]} (${phones[0]})` : '未提供')}
+              {renderDetailRow('收貨人 2', names[1] ? `${names[1]} (${phones[1]})` : '未提供')}
+            </>
+          ) : (
+            renderDetailRow(isLocked ? '取貨人' : '收貨人', `${p.recipientName || '未提供'} (${p.recipientPhone || '未提供'})`)
+          )}
+          
           {renderDetailRow('備註', p.notes)}
         </div>
       </div>

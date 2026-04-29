@@ -38,7 +38,8 @@ const OrderProcess = ({ navigateTo }) => {
             category: "🚚 配送與取貨", 
             items: [
                 { q: "運費如何計算？", a: "臺北市與新北市：商品金額滿 $5,000 元享免運；未達門檻則酌收 $350 元運費。外縣市：目前受限於物流品質，暫不提供宅配，需由顧客配合自取。" }, 
-                { q: "可以指定精準的送達時間嗎？", a: "可選擇時段，但受路況影響，建議將收貨時間設定在活動開始前 1-2 小時，保留彈性緩衝。" }
+                { q: "可以指定精準的送達時間嗎？", a: "可選擇時段，但受路況影響，建議將收貨時間設定在活動開始前 1-2 小時，保留彈性緩衝。" },
+                { q: "送貨司機可以幫我送到樓上或是進入會場嗎？", a: "由於專車配送行程較為緊湊且現場人力有限，司機服務範圍以「一樓大門口」或「會場外」面交為限，無法協助搬運上樓或進入會場內部。建議您預先安排現場工作人員或親友於約定時間協助接應。感謝您的體諒！🍡" }
             ] 
         },
         { 
@@ -54,7 +55,8 @@ const OrderProcess = ({ navigateTo }) => {
             items: [
                 { q: "婚禮系列與一般款有什麼不同？", a: "婚禮系列專為喜宴設計，採用小巧好入口的「喜糖尺寸」，並賦予「永結同心」、「佳偶天成」等專屬寓意。" }, 
                 { q: "糖葫蘆有附包裝嗎？可以當二進禮嗎？", a: "有的。每支均附透明包裝與喜慶紅心貼紙，非常適合直接作為桌上禮或二進小禮使用。" }, 
-                { q: "什麼時間點收貨最合適？", a: "強烈建議將收貨時間設定在宴客開始前 2 小時，並請婚企人員協助先存放在冷藏環境。" }
+                { q: "什麼時間點收貨最合適？", a: "強烈建議將收貨時間設定在宴客開始前 2 小時，並請婚企人員協助先存放在冷藏環境。" },
+                { q: "送貨司機可以幫我送到樓上或是進入宴客廳嗎？", a: "由於專車配送行程較為緊湊且現場人力有限，司機服務範圍以「一樓大門口」或「會場外」面交為限，無法協助搬運上樓或進入宴客廳內部。建議您預先安排現場工作人員或親友於約定時間協助接應。感謝您的體諒！🍡" }
             ] 
         }
     ];
@@ -145,7 +147,7 @@ const OrderProcess = ({ navigateTo }) => {
                         <ul className="text-sm text-gray-700 space-y-2 bg-white/40 p-4 rounded-xl border border-white">
                             <li className="flex justify-between items-center"><span className="font-bold text-gray-800">單組租金</span> <span className="text-amberRed font-bold">NT$ 200</span></li>
                             <li className="flex justify-between items-center border-b border-gray-200 pb-2"><span className="font-bold text-gray-800">單組押金</span> <span>NT$ 1,800</span></li>
-                            <li className="text-xs text-gray-500 pt-1 leading-relaxed">活動結束歸還且無毀損，即退還全額押金。若損壞將自押金扣除 NT$1,000。請勿插置糖葫蘆以外之異物。</li>
+                            <li className="text-xs text-gray-500 pt-1 leading-relaxed">活動結束歸還且無毀損，即退還全額押金。若損壞將自押金扣除 NT$1,000。請勿畫置糖葫蘆以外之異物。</li>
                         </ul>
                     </div>
                 </div>

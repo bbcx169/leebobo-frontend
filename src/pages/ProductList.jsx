@@ -4,16 +4,31 @@ import React from 'react';
 import useScrollFadeIn from '../hooks/useScrollFadeIn';
 import { products } from '../constants/data'; // 💡 修正 3：精準指向 data.js
 
-// 💡 修正 1：移除 setCart，改由 App.jsx 統一傳入 updateCart 與 handleQuantityChange
-const ProductList = ({ cart, updateCart, handleQuantityChange, navigateTo }) => {
+// 💡 修正 1：移除 setCart，改由 App.jsx 統一傳入相關函數，並新增 setAlertMsg 進行防呆提示
+const ProductList = ({ cart, updateCart, handleQuantityChange, navigateTo, setAlertMsg }) => {
   // 觸發滾動淡入動畫
   useScrollFadeIn();
+
+  // 💡 顧問新增：前往購物車的防呆檢查
+  const handleGoToCart = () => {
+    // 計算購物車內所有品項的總數量
+    const totalQty = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
+
+    if (totalQty === 0) {
+      // 若總數為 0，則攔截跳轉並給予委婉提示
+      setAlertMsg("您的購物車目前是空的，請先挑選喜歡的糖葫蘆喔！🍡");
+      return;
+    }
+
+    // 若有商品，則順利前往購物車頁面 (結帳頁)
+    navigateTo('order');
+  };
 
   return (
     <div className="relative z-10 container mx-auto px-6 pt-32 pb-16 max-w-7xl fade-in-up">
       {/* 頁面標題區塊  */}
       <header className="text-center mb-16">
-        <div className="inline-block relative cursor-pointer" onClick={() => navigateTo('order')}>
+        <div className="inline-block relative cursor-pointer" onClick={handleGoToCart}>
           <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-amberRed mb-4 tracking-widest drop-shadow-sm font-serif">商品選購</h1>
           <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-32 h-1.5 bg-warmWood rounded-full shadow-sm"></div>
         </div>
@@ -70,7 +85,7 @@ const ProductList = ({ cart, updateCart, handleQuantityChange, navigateTo }) => 
 
       {/* 底部跳轉按鈕 */}
       <div className="mt-12 flex justify-center">
-        <button onClick={() => navigateTo('order')} className="group relative flex items-center gap-3 px-8 py-4 bg-amberRed text-white rounded-full font-bold text-lg shadow-lg hover:shadow-xl hover:-translate-y-1 hover:bg-darkWood transition-all">
+        <button onClick={handleGoToCart} className="group relative flex items-center gap-3 px-8 py-4 bg-amberRed text-white rounded-full font-bold text-lg shadow-lg hover:shadow-xl hover:-translate-y-1 hover:bg-darkWood transition-all">
           前往購物車
           <svg xmlns="http://www.w3.org/2000/svg" className="transform group-hover:translate-x-1 transition-transform" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="5" y1="12" x2="19" y2="12"></line>
