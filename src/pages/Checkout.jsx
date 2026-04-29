@@ -116,7 +116,6 @@ const Checkout = ({
         return; 
       }
 
-      // 💡 修正邏輯：嚴格阻擋購物車為 0 以及未滿 50 支的情況
       if (candyQty === 0) {
         setAlertMsg("購物車目前是空的，請先選購商品！（最低起訂量為 50 支）"); 
         return;
@@ -127,7 +126,6 @@ const Checkout = ({
         return;
       }
 
-      // 當購物車大於等於 50 支且日期正確後，才呼叫 API 檢查每日產能
       setIsCheckingDate(true);
       try {
         const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzf8kJ6Ka8yGabg--MCRJ8eyucBbsGRDbceGEeH-CQDLqOMXhTCysZVrPKL0MLpSg4L/exec';
@@ -325,7 +323,7 @@ const Checkout = ({
                   <select name="deliveryCity" required value={formData.deliveryCity} onChange={handleFormChange} className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite outline-none">
                     <option value="" disabled>請選擇縣市</option>
                     <option value="taipei">臺北市</option>
-                    <option value="new_taipei">新北市</option>
+                    <option value="new_taibei">新北市</option>
                     <option value="pickup">自取</option>
                   </select>
                 </div>
@@ -353,7 +351,6 @@ const Checkout = ({
                         <div className="bg-gray-50 text-gray-600 px-4 py-3 border-r border-warmWood/30 font-bold flex items-center shrink-0">{currentCityName}</div>
                         <input type="text" name={formData.eventType === 'wedding' ? 'weddingAddress' : 'generalAddress'} required placeholder="例：信義區OO路123號" value={formData.eventType === 'wedding' ? formData.weddingAddress : formData.generalAddress} onChange={handleFormChange} className="w-full px-4 py-3 outline-none bg-transparent" />
                       </div>
-                      {/* 💡 顧問修正：針對配送範圍的溫馨提示，確保完整呈現！ */}
                       <p className="text-xs text-amberRed font-medium leading-relaxed pl-1">
                         💡 溫馨提醒：因專車配送行程緊湊與人力限制，<span className="font-bold underline">司機無法協助送上樓或送入會場內</span>。屆時需勞煩您安排親友至一樓大門口或會場外與司機面交取貨，感謝您的體諒與配合！
                       </p>
@@ -382,7 +379,6 @@ const Checkout = ({
                   </div>
                 </div>
 
-                {/* 💡 根據活動類型切換收貨人 UI */}
                 {formData.eventType === 'wedding' ? (
                   <div className="p-5 bg-pureWhite rounded-xl border border-warmWood/20 space-y-5">
                     <div className="bg-amberRed/10 border border-amberRed/20 p-4 rounded-xl text-sm text-amberRed font-medium leading-relaxed">
@@ -425,7 +421,29 @@ const Checkout = ({
               <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
                 <h2 className="text-2xl font-bold text-darkWood mb-6 font-serif flex items-center gap-2"><span className="bg-amberRed/10 p-2 rounded-lg text-amberRed">04</span> 確認訂單明細</h2>
                 <div className="bg-white p-6 rounded-2xl border border-warmWood/30 shadow-sm space-y-6 text-sm">
-                  <div className="space-y-3">
+                  
+                  {/* 💡 顧問新增：交貨方式區塊 (與 PDF 保持一致樣式) */}
+                  <div className="space-y-3 pt-2">
+                    <h3 className="text-base font-bold text-amberRed border-b border-warmWood/20 pb-2 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      交貨方式
+                    </h3>
+                    <div className="pt-1">
+                      {isLocked ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-600 border border-orange-200 rounded-lg text-sm font-bold shadow-sm">
+                          🏪 門市自取
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-sm font-bold shadow-sm">
+                          🚚 專車配送
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
                     <h3 className="text-base font-bold text-amberRed border-b border-warmWood/20 pb-2">活動資訊</h3>
                     <div className="grid grid-cols-[80px_1fr] gap-y-2">
                       {renderDetailRow('活動類型', formData.eventType === 'wedding' ? '浪漫婚禮 / 喜宴' : formData.eventType === 'school' ? '校園活動 / 園遊會' : '其他')}
@@ -451,7 +469,6 @@ const Checkout = ({
                       {renderDetailRow('訂購人', `${formData.ordererName || '未提供'} (${formData.ordererPhone || '未提供'})`)}
                       {renderDetailRow('電子信箱', formData.ordererEmail)}
                       
-                      {/* 💡 預覽畫面：依照婚禮拆分顯示 */}
                       {formData.eventType === 'wedding' ? (
                         <>
                           {renderDetailRow('收貨人 1', `${formData.recipientName || '未提供'} (${formData.recipientPhone || '未提供'})`)}
