@@ -17,6 +17,36 @@ export default function AdminModals({
   isResending, 
   onResendPDF
 }) {
+
+  // 💡 顧問優化：解析原始 location 字串，拆分為地點名稱與地址
+  // 邏輯：從 "地點：XXX\n地址：YYY" 格式中提取內容
+  const parseLocation = (rawStr = '') => {
+    const locMatch = rawStr.match(/地點：(.*?)(?:\n|$)/);
+    const addrMatch = rawStr.match(/地址：(.*?)(?:\n|$)/);
+    
+    // 如果字串中包含標籤，則提取內容；若無標籤（舊資料），則將整段視為地點名稱
+    return {
+      locName: locMatch ? locMatch[1] : (rawStr.includes('地址：') ? '' : rawStr),
+      addrValue: addrMatch ? addrMatch[1] : ''
+    };
+  };
+
+  const { locName, addrValue } = parseLocation(editModal?.location);
+
+  // 💡 顧問優化：當使用者修改拆分欄位時，自動合併為 GAS 標籤格式
+  const handleLocationPartChange = (type, value) => {
+    let newLocName = type === 'locName' ? value : locName;
+    let newAddrValue = type === 'addrValue' ? value : addrValue;
+    
+    // 合併為標準格式：地點：[內容]\n地址：[內容]
+    const formattedLocation = `地點：${newLocName}\n地址：${newAddrValue}`;
+    
+    setEditModal({
+      ...editModal,
+      location: formattedLocation
+    });
+  };
+
   return (
     <>
       {/* 1. 系統提示 Modal */}
@@ -37,7 +67,7 @@ export default function AdminModals({
         </div>
       )}
 
-      {/* 2. 修改交貨時間、地點與備註 Modal */}
+      {/* 2. 修改訂單資訊 Modal (優化版：拆分地址標籤) */}
       {editModal?.isOpen && (
         <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl border border-gray-100 animate-[fadeIn_0.2s_ease-out]">
@@ -48,6 +78,7 @@ export default function AdminModals({
             <p className="text-sm text-gray-500 mb-4 mt-3">訂單編號：<span className="font-bold text-gray-800">#{editModal.order?.orderNumber}</span></p>
             
             <div className="space-y-4 mb-6">
+              {/* 日期與時間 */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-400 mb-1">新活動日期</label>
@@ -69,19 +100,32 @@ export default function AdminModals({
                 </div>
               </div>
 
-              {/* 🚀 修改地點/地址欄位 */}
+              {/* 🚀 顧問優化：拆分地點名稱 */}
               <div>
-                <label className="block text-xs font-bold text-gray-400 mb-1">修改地點與詳細資訊</label>
-                <textarea 
-                  value={editModal.location} 
-                  onChange={e => setEditModal({...editModal, location: e.target.value})} 
-                  placeholder="請輸入新的地址或地點資訊..."
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm min-h-[80px] resize-none"
+                <label className="block text-xs font-bold text-gray-400 mb-1">地點名稱 (餐廳/門市/大樓)</label>
+                <input 
+                  type="text"
+                  value={locName} 
+                  onChange={e => handleLocationPartChange('locName', e.target.value)} 
+                  placeholder="例如：寧夏夜市攤位、某某婚宴會館"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                 />
-                <p className="text-[10px] text-gray-400 mt-1">💡 提示：此欄位內容將會直接更新至 PDF 的「配送地址」區塊。</p>
               </div>
 
-              {/* 🚀 新增：修改備註欄位 */}
+              {/* 🚀 顧問優化：拆分詳細地址 */}
+              <div>
+                <label className="block text-xs font-bold text-gray-400 mb-1">詳細地址</label>
+                <input 
+                  type="text"
+                  value={addrValue} 
+                  onChange={e => handleLocationPartChange('addrValue', e.target.value)} 
+                  placeholder="例如：臺北市大同區寧夏路..."
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                />
+                <p className="text-[10px] text-amberRed mt-1 font-medium">💡 系統會自動為此地址加上「地址：」標籤以確保 PDF 顯示正確。</p>
+              </div>
+
+              {/* 修改備註 */}
               <div>
                 <label className="block text-xs font-bold text-gray-400 mb-1">修改備註</label>
                 <textarea 
@@ -90,7 +134,6 @@ export default function AdminModals({
                   placeholder="請輸入訂單備註 (若無則留白)..."
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm min-h-[60px] resize-none"
                 />
-                <p className="text-[10px] text-gray-400 mt-1">💡 提示：此欄位內容將會直接更新至 PDF 的「備註」區塊。</p>
               </div>
             </div>
             
