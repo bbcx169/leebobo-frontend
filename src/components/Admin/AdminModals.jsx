@@ -122,7 +122,6 @@ export default function AdminModals({
                   placeholder="例如：臺北市大同區寧夏路..."
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                 />
-                <p className="text-[10px] text-amberRed mt-1 font-medium">💡 系統會自動為此地址加上「地址：」標籤以確保 PDF 顯示正確。</p>
               </div>
 
               {/* 修改備註 */}

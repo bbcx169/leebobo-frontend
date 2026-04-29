@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 
 export default function OrderTable({ 
   searchTerm, 
@@ -7,13 +7,33 @@ export default function OrderTable({
   onEditClick, 
   onResendClick 
 }) {
-  // 1. 排序狀態：預設為「建立時間 - 從新到舊」
+  // 🚀 1. 新增狀態過濾：預設為 'pending' (未完成)
+  const [statusFilter, setStatusFilter] = useState('pending'); // 'pending' | 'completed' | 'all'
+  
+  // 排序狀態
   const [sortConfig, setSortConfig] = useState({ key: 'orderCreation', direction: 'desc' });
 
-  // 2. 排序邏輯：處理日期格式並執行排序
-  const sortedOrders = useMemo(() => {
-    let sortableItems = [...filteredOrders];
-    sortableItems.sort((a, b) => {
+  // 🚀 2. 核心邏輯：根據「狀態頁籤」與「排序」計算最終顯示清單
+  const finalDisplayOrders = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // 歸零時間以進行日期比對
+
+    // 首先根據「活動日期」過濾狀態
+    let statusItems = filteredOrders.filter(order => {
+      if (!order.eventDate) return true;
+      const eDate = new Date(order.eventDate.replace(/-/g, '/'));
+      eDate.setHours(0, 0, 0, 0);
+
+      if (statusFilter === 'pending') {
+        return eDate >= today; // 未完成：今天(含)之後
+      } else if (statusFilter === 'completed') {
+        return eDate < today; // 已完成：昨天(含)之前
+      }
+      return true; // 全部
+    });
+
+    // 執行排序邏輯
+    statusItems.sort((a, b) => {
       let dateA, dateB;
       if (sortConfig.key === 'orderCreation') {
         dateA = new Date(`${a.orderDate} ${a.orderTime || '00:00:00'}`).getTime();
@@ -28,8 +48,9 @@ export default function OrderTable({
       if (dateA > dateB) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-    return sortableItems;
-  }, [filteredOrders, sortConfig]);
+    
+    return statusItems;
+  }, [filteredOrders, statusFilter, sortConfig]);
 
   const requestSort = (key) => {
     let direction = 'asc';
@@ -42,13 +63,33 @@ export default function OrderTable({
     return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
   };
 
+  // 滑鼠拖曳滾動邏輯
+  const scrollRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    setStartX(e.pageX - scrollRef.current.offsetLeft);
+    setScrollLeft(scrollRef.current.scrollLeft);
+  };
+  const handleMouseLeave = () => setIsDragging(false);
+  const handleMouseUp = () => setIsDragging(false);
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    scrollRef.current.scrollLeft = scrollLeft - walk;
+  };
+
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-[fadeIn_0.3s_ease-out]">
-      {/* 標題與搜尋列：字體加大 */}
+    <div className="w-[96%] max-w-[1600px] mx-auto space-y-6 animate-[fadeIn_0.3s_ease-out]">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <h2 className="text-4xl font-bold text-gray-800 font-serif">訂單總覽</h2>
-          <p className="text-gray-500 mt-2 text-lg">點擊表頭切換排序，搜尋支援姓名、電話與編號</p>
+          <p className="text-gray-500 mt-2 text-lg">篩選狀態與排序，搜尋支援姓名、電話與編號</p>
         </div>
         <div className="relative w-full md:w-80">
           <input 
@@ -62,28 +103,59 @@ export default function OrderTable({
         </div>
       </header>
 
+      {/* 🚀 3. 狀態切換頁籤 UI */}
+      <div className="flex items-center gap-2 bg-gray-100/50 p-1.5 rounded-2xl w-fit border border-gray-200/50 shadow-sm">
+        <button 
+          onClick={() => setStatusFilter('pending')}
+          className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${statusFilter === 'pending' ? 'bg-white text-amberRed shadow-md scale-105' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          🕒 未完成訂單
+        </button>
+        <button 
+          onClick={() => setStatusFilter('completed')}
+          className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${statusFilter === 'completed' ? 'bg-white text-emerald-600 shadow-md scale-105' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          ✅ 已完成訂單
+        </button>
+        <button 
+          onClick={() => setStatusFilter('all')}
+          className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${statusFilter === 'all' ? 'bg-white text-blue-600 shadow-md scale-105' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          📁 全部訂單
+        </button>
+      </div>
+
       <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full text-left text-base text-gray-600 min-w-[1100px]">
+        <div 
+          ref={scrollRef}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          className="overflow-x-auto pb-2 cursor-grab active:cursor-grabbing select-none"
+        >
+          <table className="w-full text-left text-base text-gray-600 min-w-[1000px]">
             <thead className="bg-gray-50 text-gray-700">
               <tr>
-                <th className="px-6 py-5 font-bold whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => requestSort('orderCreation')}>
+                <th className="px-4 py-5 font-bold whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => requestSort('orderCreation')}>
                   訂單編號/建立時間 {getSortIcon('orderCreation')}
                 </th>
-                <th className="px-6 py-5 font-bold whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => requestSort('eventDate')}>
+                <th className="px-4 py-5 font-bold whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => requestSort('eventDate')}>
                   活動日期 {getSortIcon('eventDate')}
                 </th>
-                <th className="px-6 py-5 font-bold whitespace-nowrap">訂購人 / 收件人</th>
-                <th className="px-6 py-5 font-bold whitespace-nowrap w-80">配送 / 自取資訊</th>
-                <th className="px-6 py-5 font-bold text-right whitespace-nowrap">總金額</th>
-                <th className="px-6 py-5 font-bold text-center whitespace-nowrap">客服操作</th>
+                <th className="px-4 py-5 font-bold whitespace-nowrap">訂購人 / 收件人</th>
+                <th className="px-4 py-5 font-bold whitespace-nowrap w-80">配送 / 自取資訊</th>
+                <th className="px-4 py-5 font-bold text-right whitespace-nowrap">總金額</th>
+                <th className="px-4 py-5 font-bold text-center whitespace-nowrap sticky right-0 bg-gray-50 z-10 shadow-[-4px_0_10px_-3px_rgba(0,0,0,0.05)] border-l border-gray-100">
+                  客服操作
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {sortedOrders.length === 0 ? (
-                <tr><td colSpan="6" className="px-6 py-16 text-center text-gray-400 text-lg">找不到符合條件的訂單</td></tr>
+              {finalDisplayOrders.length === 0 ? (
+                <tr><td colSpan="6" className="px-4 py-16 text-center text-gray-400 text-lg">目前沒有此分類的訂單紀錄</td></tr>
               ) : (
-                sortedOrders.map(order => {
+                finalDisplayOrders.map(order => {
                   const isPickup = order.deliveryCity === '自取';
                   let cleanAddress = '';
                   if (order.specificDetails) {
@@ -97,9 +169,8 @@ export default function OrderTable({
                     : (cleanAddress || '未提供詳細地址');
 
                   return (
-                    <tr key={order.orderNumber} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-5">
-                        {/* 💡 顧問修正：相容 pdfUrl 與 pdfDownloadUrl */}
+                    <tr key={order.orderNumber} className="hover:bg-gray-50 transition-colors group">
+                      <td className="px-4 py-5">
                         {(order.pdfUrl || order.pdfDownloadUrl) ? (
                           <a href={order.pdfUrl || order.pdfDownloadUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-bold text-blue-600 hover:text-blue-800 hover:underline">
                             #{order.orderNumber}
@@ -111,7 +182,7 @@ export default function OrderTable({
                         <div className="text-sm text-gray-400 mt-1">{order.orderDate} {order.orderTime?.substring(0,5)}</div>
                       </td>
 
-                      <td className="px-6 py-5">
+                      <td className="px-4 py-5">
                         <div className="flex items-center gap-2">
                           <span className={`inline-block px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap ${new Date(order.eventDate?.replace(/-/g, '/')) < new Date(new Date().setHours(0,0,0,0)) ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-700'}`}>
                             {order.eventDate}
@@ -123,7 +194,7 @@ export default function OrderTable({
                         <div className="text-sm text-gray-500 mt-1.5 font-medium">{order.eventTime || '未定時'}</div>
                       </td>
 
-                      <td className="px-6 py-5">
+                      <td className="px-4 py-5">
                         <div className="whitespace-nowrap flex items-center gap-2 mb-1">
                           <span className="text-gray-400 text-xs bg-gray-100 px-1 rounded font-normal">訂</span>
                           <span className="font-bold text-gray-800">{order.ordererName}</span> 
@@ -136,7 +207,7 @@ export default function OrderTable({
                         </div>
                       </td>
 
-                      <td className="px-6 py-5">
+                      <td className="px-4 py-5">
                         <div className="flex flex-col items-start gap-2">
                           {isPickup ? (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-600 border border-orange-200 rounded-lg text-sm font-bold whitespace-nowrap">🏪 門市自取</span>
@@ -147,14 +218,14 @@ export default function OrderTable({
                         </div>
                       </td>
 
-                      <td className="px-6 py-5 text-right font-black text-gray-900 text-xl whitespace-nowrap">
+                      <td className="px-4 py-5 text-right font-black text-gray-900 text-xl whitespace-nowrap">
                         NT$ {order.totalPrice?.toLocaleString()}
                       </td>
 
-                      <td className="px-6 py-5 text-center">
-                        <div className="flex items-center justify-center gap-3">
-                          <button onClick={() => onEditClick(order)} className="px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-xl text-sm font-bold border border-blue-200 shadow-sm transition-all whitespace-nowrap">修改資訊</button>
-                          <button onClick={() => onResendClick(order)} className="px-4 py-2 bg-white text-amberRed hover:bg-red-50 rounded-xl text-sm font-bold border border-amberRed/30 shadow-sm transition-all whitespace-nowrap">補發 PDF</button>
+                      <td className="px-4 py-5 text-center sticky right-0 bg-white group-hover:bg-gray-50 transition-colors z-10 shadow-[-4px_0_10px_-3px_rgba(0,0,0,0.05)] border-l border-gray-50">
+                        <div className="flex flex-col xl:flex-row items-center justify-center gap-2">
+                          <button onClick={() => onEditClick(order)} className="w-full xl:w-auto px-3 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-xl text-sm font-bold border border-blue-200 shadow-sm transition-all whitespace-nowrap">修改資訊</button>
+                          <button onClick={() => onResendClick(order)} className="w-full xl:w-auto px-3 py-2 bg-white text-amberRed hover:bg-red-50 rounded-xl text-sm font-bold border border-amberRed/30 shadow-sm transition-all whitespace-nowrap">補發 PDF</button>
                         </div>
                       </td>
                     </tr>

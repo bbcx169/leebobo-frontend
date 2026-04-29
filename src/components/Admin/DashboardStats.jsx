@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 
 export default function DashboardStats({ 
   orders, 
@@ -8,7 +8,10 @@ export default function DashboardStats({
   dailyMaterials 
 }) {
 
-  // 🚀 新增邏輯：計算「待交貨訂單總數」(大於等於今日的訂單)
+  // 🚀 新增狀態：追蹤是否已完成初次日期自動定位
+  const [isInitialDateSet, setIsInitialDateSet] = useState(false);
+
+  // 🚀 邏輯：計算「待交貨訂單總數」(大於等於今日的訂單)
   const pendingOrdersCount = useMemo(() => {
     if (!orders || orders.length === 0) return 0;
     const today = new Date();
@@ -22,7 +25,7 @@ export default function DashboardStats({
     }).length;
   }, [orders]);
 
-  // 🚀 新增邏輯：動態計算離今日(含)最近的 5 個有訂單的日期
+  // 🚀 邏輯：動態計算離今日(含)最近的 5 個有訂單的日期
   const upcomingDates = useMemo(() => {
     if (!orders || orders.length === 0) return [];
 
@@ -50,17 +53,26 @@ export default function DashboardStats({
     }));
   }, [orders]);
 
+  // 🚀 新增邏輯：當有未來訂單時，自動將預設日期設定為最近的一筆訂單日期 (僅執行一次)
+  useEffect(() => {
+    if (!isInitialDateSet && upcomingDates.length > 0) {
+      setSelectedDate(upcomingDates[0].date);
+      setIsInitialDateSet(true);
+    }
+  }, [upcomingDates, isInitialDateSet, setSelectedDate]);
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 md:space-y-8 animate-[fadeIn_0.3s_ease-out]">
       <header>
-        <h2 className="text-3xl md:text-4xl font-bold text-gray-800">排程與備料看板</h2>
+        {/* 🚀 修正：排程備料看板 */}
+        <h2 className="text-3xl md:text-4xl font-bold text-gray-800">排程備料看板</h2>
         <p className="text-gray-500 mt-2 text-base md:text-lg">以「活動出貨日」為核心的任務追蹤</p>
       </header>
 
       {/* 頂部統計卡片區 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         
-        {/* 🚀 更新：待交貨訂單總數 (字體加大) */}
+        {/* 待交貨訂單總數 */}
         <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100 flex flex-col justify-center items-center text-center">
           <p className="text-gray-500 text-base md:text-lg font-bold mb-2">待交貨訂單總數</p>
           <p className="text-5xl md:text-6xl font-black text-gray-800">
@@ -126,13 +138,13 @@ export default function DashboardStats({
               <p className="text-gray-400 text-base text-center py-4">本日尚無訂單安排</p>
             ) : (
               <div>
-                {/* 🚀 糖葫蘆總需數量 */}
+                {/* 糖葫蘆總需數量 */}
                 <div className="flex justify-between items-end border-b border-[#EEDC82] pb-3 mb-3">
                   <span className="text-base font-bold text-gray-700">糖葫蘆總需數量</span>
                   <span className="text-4xl font-black text-amberRed">{dailyMaterials.totalCandies} <span className="text-base text-gray-600 font-normal">支</span></span>
                 </div>
                 
-                {/* 🚀 新增：掃帚總需數量 */}
+                {/* 掃帚總需數量 */}
                 <div className="flex justify-between items-end border-b border-[#EEDC82] pb-4 mb-4">
                   <span className="text-base font-bold text-gray-700">掃帚總需數量</span>
                   <span className="text-4xl font-black text-blue-600">{dailyMaterials.items['5']?.qty || 0} <span className="text-base text-gray-600 font-normal">組</span></span>
@@ -164,7 +176,7 @@ export default function DashboardStats({
           ) : (
             <div className="relative border-l-4 border-amberRed/30 ml-3 md:ml-5 space-y-8 pb-6">
               {dailyOrders.map((order, idx) => {
-                // 🚀 判斷是否為門市自取
+                // 判斷是否為門市自取
                 const isPickup = order.deliveryCity === '自取' || order.eventType === '自取';
 
                 return (
@@ -175,7 +187,7 @@ export default function DashboardStats({
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
                         <div className="flex flex-col items-start gap-2">
                           <span className="text-amberRed font-black text-2xl tracking-wide">{order.eventTime || '未定時'}</span>
-                          {/* 🚀 新增：自取/配送標籤 */}
+                          {/* 自取/配送標籤 */}
                           {isPickup ? (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-700 border border-orange-200 rounded-lg text-sm font-bold">🏪 門市自取</span>
                           ) : (
@@ -183,7 +195,7 @@ export default function DashboardStats({
                           )}
                         </div>
                         
-                        {/* 🚀 顧問修正：相容 pdfUrl 與 pdfDownloadUrl，點擊訂單編號開啟 PDF */}
+                        {/* 點擊訂單編號開啟 PDF */}
                         {(order.pdfUrl || order.pdfDownloadUrl) ? (
                           <a href={order.pdfUrl || order.pdfDownloadUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-amberRed hover:text-red-800 hover:underline flex items-center gap-1.5 bg-red-50 px-3 py-2 rounded-lg border border-red-100 shadow-sm transition-colors" title="點擊開啟 PDF">
                             #{order.orderNumber}
@@ -194,7 +206,7 @@ export default function DashboardStats({
                         )}
                       </div>
                       
-                      {/* 🚀 新增：訂購人與收件人資訊 */}
+                      {/* 訂購人與收件人資訊 */}
                       <div className="bg-white p-4 rounded-xl border border-gray-200 text-base mb-4 shadow-sm space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-gray-500 text-sm bg-gray-100 px-2 py-1 rounded font-bold">訂購人</span>
@@ -221,7 +233,7 @@ export default function DashboardStats({
                         <p className="font-bold text-gray-800 border-b border-gray-100 pb-2 mb-3 text-lg">📦 出貨明細：</p>
                         <p className="text-gray-700 font-medium whitespace-pre-line leading-loose text-base">{order.itemsList}</p>
                         
-                        {/* 🚀 新增：突顯租借掃帚 */}
+                        {/* 突顯租借掃帚 */}
                         {order.cart && order.cart['5'] > 0 && (
                           <div className="mt-4 inline-block bg-blue-50 text-blue-700 font-bold px-4 py-2 rounded-lg border border-blue-200 text-base shadow-sm">
                             🧹 包含租借掃帚 {order.cart['5']} 組
