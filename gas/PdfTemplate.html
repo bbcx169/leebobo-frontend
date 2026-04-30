@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { 
+      font-family: 'Helvetica Neue', Helvetica, Arial, 'Microsoft JhengHei', sans-serif;
+      background-color: #FAF7F2; 
+      padding: 20px; 
+    }
+    .container { 
+      background-color: #FFFFFF; 
+      border-radius: 16px; 
+      padding: 30px;
+      border: 1px solid #E6D5C3; 
+      max-width: 800px; 
+      margin: auto; 
+    }
+    .header { 
+      text-align: center;
+      border-bottom: 1px solid #E6D5C3; 
+      padding-bottom: 20px; 
+      margin-bottom: 20px; 
+    }
+    .title { 
+      color: #A52A2A;
+      font-size: 32px; 
+      font-weight: bold; 
+      margin: 0 0 15px 0; 
+      letter-spacing: 4px; 
+      font-family: serif;
+    }
+    .section-title { 
+      color: #A52A2A; 
+      font-size: 16px; 
+      font-weight: bold; 
+      border-bottom: 1px solid #E6D5C3;
+      padding-bottom: 5px; 
+      margin-bottom: 15px; 
+      margin-top: 25px; 
+    }
+    .info-table { 
+      width: 100%; 
+      font-size: 14px;
+      border-collapse: collapse; 
+    }
+    .info-table td { 
+      padding: 6px 0; 
+      vertical-align: top;
+    }
+    .label { 
+      color: #888888; 
+      font-weight: bold; 
+      width: 90px;
+    }
+    .value { 
+      color: #3E2723; 
+      font-weight: bold;
+    }
+    .summary-box { 
+      background-color: #FAF7F2; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin-top: 20px;
+    }
+    .delivery-badge { 
+      display: inline-block; 
+      padding: 4px 12px; 
+      border-radius: 6px; 
+      font-size: 13px;
+      font-weight: bold; 
+      margin-top: 5px; 
+    }
+    .badge-pickup { 
+      background-color: #FFF7ED; 
+      color: #EA580C;
+      border: 1px solid #FFEDD5; 
+    }
+    .badge-delivery { 
+      background-color: #EFF6FF; 
+      color: #2563EB;
+      border: 1px solid #DBEAFE; 
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2 class="title">李伯伯糖葫蘆</h2>
+      <div style="font-size: 16px; font-weight: bold; color: #3E2723; margin-bottom: 8px;">
+        訂購單編號 ： <?= data.orderNumber ?>
+      </div>
+      <div style="font-size: 16px; color: #3E2723;">
+        訂購時間：<?= data.orderDate ?> <?= displayTime ?>
+      </div>
+    </div>
+
+    <div class="section-title">交貨方式</div>
+    <div class="delivery-badge <?= isLocked ? 'badge-pickup' : 'badge-delivery' ?>">
+      <?= isLocked ? '🏪 門市自取' : '🚚 專車配送' ?>
+    </div>
+
+    <div class="section-title">活動資訊</div>
+    <table class="info-table">
+      <tr><td class="label">活動類型</td><td class="value"><?= data.eventType ?></td></tr>
+      <tr><td class="label">活動日期</td><td class="value"><?= data.eventDate || '未填寫' ?></td></tr>
+      <tr><td class="label"><?= isLocked ? '取貨時間' : '收貨時間' ?></td><td class="value"><?= data.eventTime || '未填寫' ?></td></tr>
+      <? if (locationName) { ?>
+        <tr><td class="label"><?= isLocked ? '取貨地點' : '地點名稱' ?></td><td class="value"><?= locationName ?></td></tr>
+      <? } ?>
+      <tr><td class="label"><?= isLocked ? '取貨地址' : '配送地址' ?></td><td class="value"><?= fullAddress ?></td></tr>
+    </table>
+
+    <div class="section-title">聯絡資訊</div>
+    <table class="info-table">
+      <tr>
+        <td class="label">訂購人</td>
+        <td class="value"><?= data.ordererName ?> <span style="font-size:12px; color:#666;">(<?= data.ordererPhone ?>)</span></td>
+      </tr>
+      <? if (data.ordererEmail) { ?>
+        <tr><td class="label">電子信箱</td><td class="value"><?= data.ordererEmail ?></td></tr>
+      <? } ?>
+      
+      <?!= recipientHtml ?>
+      
+      <? if (groomInfo && groomInfo !== '未提供') { ?>
+        <tr><td class="label">新人資訊</td><td class="value"><?= groomInfo ?></td></tr>
+      <? } ?>
+      
+      <? if (data.notes) { ?>
+        <tr><td class="label">備註</td><td class="value" style="line-height: 1.5;"><?!= notesHtml ?></td></tr>
+      <? } ?>
+    </table>
+
+    <div class="section-title">購買項目</div>
+    <div class="summary-box">
+      <table style="width: 100%; border-collapse: collapse;">
+        <?!= itemsHtml ?>
+      </table>
+      
+      <table style="width: 100%; border-collapse: collapse; margin-top: 15px; border-top: 1px solid #E6D5C3; padding-top: 10px;">
+        <tr>
+          <td style="padding: 6px 0; color: #666666; font-size: 13px;">商品小計 (<?= candyQty ?> 支)</td>
+          <td style="padding: 6px 0; text-align: right; color: #666666; font-size: 13px;">NT$ <?= (data.candyTotal || 0).toLocaleString() ?></td>
+        </tr>
+        <? if (broomQty > 0) { ?>
+          <tr>
+            <td style="padding: 6px 0; color: #666666; font-size: 13px;">掃帚租金 (<?= broomQty ?> 組)</td>
+            <td style="padding: 6px 0; text-align: right; color: #666666; font-size: 13px;">NT$ <?= (data.broomRent || 0).toLocaleString() ?></td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #059669; font-size: 13px; font-weight: bold;">掃帚押金 (歸還後退回)</td>
+            <td style="padding: 6px 0; text-align: right; color: #059669; font-size: 13px; font-weight: bold;">NT$ <?= (data.broomDeposit || 0).toLocaleString() ?></td>
+          </tr>
+        <? } ?>
+        <tr>
+          <td style="padding: 6px 0; color: #666666; font-size: 13px;">配送運費</td>
+          <td style="padding: 6px 0; text-align: right; color: #666666; font-size: 13px;">NT$ <?= (data.shippingFee || 0).toLocaleString() ?></td>
+        </tr>
+        <tr>
+          <td style="padding: 15px 0 0 0; color: #3E2723; font-size: 16px; font-weight: bold; border-top: 1px solid #E6D5C3; margin-top: 10px;">預估總金額</td>
+          <td style="padding: 15px 0 0 0; text-align: right; color: #A52A2A; font-size: 20px; font-weight: bold; border-top: 1px solid #E6D5C3; margin-top: 10px;">
+            NT$ <?= (data.totalAmount || 0).toLocaleString() ?>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="section-title">商家資訊</div>
+    <div class="summary-box" style="margin-top: 10px; padding: 20px; border-radius: 8px;">
+       <div style="color: #A52A2A; font-size: 18px; font-weight: bold; margin-bottom: 12px; letter-spacing: 1px;">寧夏夜市古早味糖葫蘆</div>
+       <table style="font-size: 14px; color: #3E2723; border-collapse: collapse; line-height: 1.8; width: 100%;">
+         <tr>
+           <td style="color: #D2B48C; padding-right: 8px; vertical-align: top; font-size: 16px; font-weight: bold; width: 15px;">●</td>
+           <td><span style="font-weight: bold; color: #888888;">地址：</span>臺北市大同區寧夏夜市第61號攤位 (蓬萊國小前)</td>
+         </tr>
+         <tr>
+           <td style="color: #D2B48C; padding-right: 8px; vertical-align: top; font-size: 16px; font-weight: bold;">●</td>
+           <td><span style="font-weight: bold; color: #888888;">聯絡電話：</span>0912-294-022</td>
+         </tr>
+         <tr>
+           <td style="color: #D2B48C; padding-right: 8px; vertical-align: top; font-size: 16px; font-weight: bold;">●</td>
+           <td><span style="font-weight: bold; color: #888888;">營業時間：</span>18:00 ~ 23:00</td>
+         </tr>
+       </table>
+    </div>
+  </div>
+</body>
+</html>
