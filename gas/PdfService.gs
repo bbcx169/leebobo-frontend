@@ -42,19 +42,16 @@ const PdfService = {
     
     let fullAddress = data.deliveryCity || '';
     let locationName = ''; 
-    let groomInfo = '';
 
     // 解析特殊詳細資訊
     if (data.specificDetails) {
       const lines = String(data.specificDetails).split('\n');
+      
       const addrLine = lines.find(l => l.startsWith('地址：') || l.startsWith('取貨地址：'));
       if (addrLine) fullAddress = addrLine.replace(/^(地址：|取貨地址：)/, '').trim();
       
-      const locLine = lines.find(l => l.startsWith('地點：') || l.startsWith('餐廳：'));
-      if (locLine) locationName = locLine.replace(/^(地點：|餐廳：)/, '').trim();
-      
-      const groomLine = lines.find(l => l.startsWith('新人：'));
-      if (groomLine) groomInfo = groomLine.replace('新人：', '').trim();
+      const locLine = lines.find(l => l.startsWith('地點：'));
+      if (locLine) locationName = locLine.replace(/^地點：/, '').trim();
     }
 
     if (isLocked && (!fullAddress || fullAddress === '自取' || fullAddress === 'pickup')) { 
@@ -89,7 +86,6 @@ const PdfService = {
     template.isLocked = isLocked;
     template.fullAddress = fullAddress;
     template.locationName = locationName;
-    template.groomInfo = groomInfo;
     template.recipientHtml = recipientHtml;
     template.notesHtml = notesHtml;
     template.displayTime = displayTime;

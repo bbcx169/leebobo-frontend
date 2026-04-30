@@ -1,4 +1,3 @@
-=== 100% 完整代碼：DatabaseService.gs (路徑：gas/DatabaseService.gs) ===
 /**
  * ==========================================
  * 李伯伯糖葫蘆 - 資料庫服務 (DatabaseService.gs)
