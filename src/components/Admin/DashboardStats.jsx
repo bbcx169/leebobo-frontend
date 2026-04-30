@@ -9,6 +9,9 @@ export default function DashboardStats({
 }) {
 
   const [isInitialDateSet, setIsInitialDateSet] = useState(false);
+  
+  // 💡 手風琴展開狀態管理
+  const [expandedOrders, setExpandedOrders] = useState({});
 
   const pendingOrdersCount = useMemo(() => {
     if (!orders || orders.length === 0) return 0;
@@ -54,6 +57,39 @@ export default function DashboardStats({
       setIsInitialDateSet(true);
     }
   }, [upcomingDates, isInitialDateSet, setSelectedDate]);
+
+  // 💡 當日期改變或訂單資料更新時，判斷是否自動展開
+  useEffect(() => {
+    if (dailyOrders && dailyOrders.length === 1) {
+      setExpandedOrders({ 0: true }); // 只有一筆時預設展開第一筆
+    } else {
+      setExpandedOrders({}); // 多筆時預設全部收合
+    }
+  }, [selectedDate, dailyOrders]);
+
+  // 💡 切換單一訂單展開/收合的函式
+  const toggleOrder = (idx) => {
+    setExpandedOrders(prev => ({
+      ...prev,
+      [idx]: !prev[idx]
+    }));
+  };
+
+  // 💡 判斷是否「所有」訂單都已展開
+  const isAllExpanded = dailyOrders && dailyOrders.length > 0 && dailyOrders.every((_, idx) => expandedOrders[idx]);
+
+  // 💡 一鍵展開/收合所有訂單
+  const toggleAllOrders = () => {
+    if (isAllExpanded) {
+      setExpandedOrders({}); // 全部收合
+    } else {
+      const allExpanded = {};
+      dailyOrders.forEach((_, idx) => {
+        allExpanded[idx] = true;
+      });
+      setExpandedOrders(allExpanded); // 全部展開
+    }
+  };
 
   return (
     <>
@@ -158,6 +194,11 @@ export default function DashboardStats({
               ) : (
                 <div>
                   <div className="flex justify-between items-end border-b border-[#EEDC82] pb-3 mb-3">
+                    <span className="text-base font-bold text-gray-700">訂單總數量</span>
+                    <span className="text-4xl font-black text-[#8B4513]">{dailyOrders.length} <span className="text-base text-gray-600 font-normal">筆</span></span>
+                  </div>
+
+                  <div className="flex justify-between items-end border-b border-[#EEDC82] pb-3 mb-3">
                     <span className="text-base font-bold text-gray-700">糖葫蘆總需數量</span>
                     <span className="text-4xl font-black text-amberRed">{dailyMaterials.totalCandies} <span className="text-base text-gray-600 font-normal">支</span></span>
                   </div>
@@ -185,49 +226,69 @@ export default function DashboardStats({
           {/* 右側：當日交貨時間軸 (列印模式核心) */}
           <div className="lg:col-span-2 bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100 print:p-0 print:border-none print:shadow-none print:w-full">
             
-            <div className="flex justify-between items-center mb-6 print:hidden">
-              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <svg className="w-6 h-6 text-amberRed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <span>當日交貨時間軸</span>
-              </h3>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 print:hidden">
               
-              {dailyOrders.length > 0 && (
-                <button
-                  onClick={() => window.print()}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-amberRed text-white rounded-xl font-bold hover:bg-red-800 transition-colors shadow-sm"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                  列印出貨單
-                </button>
-              )}
+              {/* 💡 左側標題與展開按鈕群組 */}
+              <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2 whitespace-nowrap">
+                  <svg className="w-6 h-6 text-amberRed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  <span>當日交貨時間軸</span>
+                </h3>
+                
+                {/* 💡 移至此處：一鍵展開/收合按鈕 (當訂單大於1筆時顯示) */}
+                {dailyOrders.length > 1 && (
+                  <button
+                    onClick={toggleAllOrders}
+                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg font-bold hover:bg-gray-200 transition-colors shadow-sm text-sm"
+                  >
+                    <svg className={`w-4 h-4 transition-transform duration-300 ${isAllExpanded ? 'rotate-180 text-amberRed' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    {isAllExpanded ? '全部收合' : '展開全部'}
+                  </button>
+                )}
+              </div>
+              
+              {/* 💡 右側列印按鈕 */}
+              <div className="w-full sm:w-auto">
+                {dailyOrders.length > 0 && (
+                  <button
+                    onClick={() => window.print()}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-amberRed text-white rounded-xl font-bold hover:bg-red-800 transition-colors shadow-sm"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    列印出貨單
+                  </button>
+                )}
+              </div>
             </div>
 
             {dailyOrders.length === 0 ? (
               <div className="h-64 flex items-center justify-center text-gray-400 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 text-lg print:hidden">當日行程空檔，職人可以休息囉！</div>
             ) : (
-              // 🚀 關鍵：print:grid-cols-2 實現左右並排
-              <div className="relative border-l-4 border-amberRed/30 ml-3 md:ml-5 space-y-8 pb-6 print:border-none print:ml-0 print:space-y-0 print:grid print:grid-cols-2 print:gap-6 print:pb-0">
+              <div className="relative border-l-4 border-amberRed/30 ml-3 md:ml-5 space-y-6 pb-6 print:border-none print:ml-0 print:space-y-0 print:grid print:grid-cols-2 print:gap-6 print:pb-0">
                 {dailyOrders.map((order, idx) => {
                   const isPickup = order.deliveryCity === '自取' || order.eventType === '自取';
+                  const isExpanded = expandedOrders[idx];
 
                   return (
                     <div key={idx} className="relative pl-6 md:pl-8 print:pl-0 print:break-inside-avoid">
-                      <span className="absolute -left-[14px] top-1 w-6 h-6 rounded-full bg-white border-4 border-amberRed shadow-sm print:hidden"></span>
+                      <span 
+                        onClick={() => toggleOrder(idx)}
+                        className="absolute -left-[14px] top-6 w-6 h-6 rounded-full bg-white border-4 border-amberRed shadow-sm cursor-pointer hover:scale-110 transition-transform print:hidden"
+                        title="點擊展開/收合訂單"
+                      ></span>
                       
-                      {/* 訂單卡片： 
-                          列印版使用 print:flex-col 與 min-h-[92vh] 來確保 A4 佈局
-                      */}
-                      <div className="bg-gray-50 p-5 rounded-xl border border-gray-100 hover:shadow-md transition-all 
+                      <div className={`bg-gray-50 rounded-xl border ${isExpanded ? 'border-amberRed/40 shadow-md' : 'border-gray-100 hover:shadow-md'} transition-all overflow-hidden 
                                       print:bg-white print:border-2 print:border-dashed print:border-gray-500 print:shadow-none print:rounded-none 
-                                      print:p-5 print:min-h-[92vh] print:flex print:flex-col">
+                                      print:min-h-[92vh] print:flex print:flex-col`}>
                         
-                        {/* 專屬出貨單表頭 */}
-                        <div className="hidden print:block text-center text-xl font-bold text-gray-800 border-b-2 border-black pb-2 mb-4 tracking-widest">
+                        <div className="hidden print:block text-center text-xl font-bold text-gray-800 border-b-2 border-black pb-2 mb-4 tracking-widest print:pt-5 print:px-5">
                           {selectedDate} 出貨單
                         </div>
 
-                        {/* 時間與單號 - 固定的基礎高度 */}
-                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4 print:flex-row print:justify-between print:border-b print:border-gray-300 print:pb-3 print:mb-3">
+                        <div 
+                          className="p-5 cursor-pointer flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 hover:bg-gray-100/50 transition-colors print:p-5 print:pt-0 print:cursor-auto print:hover:bg-transparent print:flex-row print:justify-between print:border-b print:border-gray-300 print:pb-3 print:mb-3"
+                          onClick={() => toggleOrder(idx)}
+                        >
                           <div className="flex flex-col items-start gap-2">
                             <span className="text-amberRed font-black text-2xl tracking-wide print:text-black print:text-2xl">{order.eventTime || '未定時'}</span>
                             {isPickup ? (
@@ -237,63 +298,75 @@ export default function DashboardStats({
                             )}
                           </div>
                           
-                          <div className="print:hidden">
-                            {(order.pdfUrl || order.pdfDownloadUrl) ? (
-                              <a href={order.pdfUrl || order.pdfDownloadUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-amberRed hover:text-red-800 hover:underline flex items-center gap-1.5 bg-red-50 px-3 py-2 rounded-lg border border-red-100 shadow-sm transition-colors" title="點擊開啟 PDF">
-                                #{order.orderNumber}
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                              </a>
-                            ) : (
-                              <span className="text-sm font-bold text-gray-400 bg-gray-100 px-3 py-2 rounded-lg">#{order.orderNumber}</span>
+                          <div className="flex items-center gap-4">
+                            <div className="print:hidden">
+                              {(order.pdfUrl || order.pdfDownloadUrl) ? (
+                                <a 
+                                  href={order.pdfUrl || order.pdfDownloadUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  onClick={(e) => e.stopPropagation()} 
+                                  className="text-sm font-bold text-amberRed hover:text-red-800 hover:underline flex items-center gap-1.5 bg-red-50 px-3 py-2 rounded-lg border border-red-100 shadow-sm transition-colors" 
+                                  title="點擊開啟 PDF"
+                                >
+                                  #{order.orderNumber}
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                </a>
+                              ) : (
+                                <span className="text-sm font-bold text-gray-400 bg-gray-100 px-3 py-2 rounded-lg">#{order.orderNumber}</span>
+                              )}
+                            </div>
+                            <div className="hidden print:block text-base font-bold text-gray-600 mt-1">
+                              單號：#{order.orderNumber}
+                            </div>
+                            
+                            <div className="print:hidden text-gray-400 bg-white p-1 rounded-full shadow-sm">
+                              <svg className={`w-5 h-5 transition-transform duration-300 ${isExpanded ? 'rotate-180 text-amberRed' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className={`${isExpanded ? 'block' : 'hidden'} px-5 pb-5 print:block print:px-5 print:pb-5 print:pt-0 print:flex-1 print:flex print:flex-col animate-[fadeIn_0.2s_ease-out]`}>
+                          
+                          <div className="bg-white p-4 rounded-xl border border-gray-200 text-base mb-4 shadow-sm space-y-2 print:border-none print:shadow-none print:p-0 print:mb-4 print:space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-gray-500 text-sm bg-gray-100 px-2 py-1 rounded font-bold print:bg-transparent print:text-gray-800 print:text-base print:p-0">訂購人：</span>
+                              <span className="font-bold text-gray-900 text-lg print:text-lg">{order.ordererName}</span>
+                              <span className="text-gray-600 font-medium print:text-gray-800 print:text-base">({order.ordererPhone})</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-gray-500 text-sm bg-gray-100 px-2 py-1 rounded font-bold print:bg-transparent print:text-gray-800 print:text-base print:p-0">{isPickup ? '取貨人：' : '收件人：'}</span>
+                              <span className="font-bold text-gray-900 text-lg print:text-lg">{order.recipientName}</span>
+                              <span className="text-gray-600 font-medium print:text-gray-800 print:text-base">({order.recipientPhone})</span>
+                            </div>
+                          </div>
+
+                          <div className="mb-4 print:mb-4 print:flex-0.5 print:min-h-0">
+                            <h4 className="font-bold text-gray-800 text-lg mb-1 flex items-center gap-2 print:text-base print:mb-1">
+                              <svg className="w-5 h-5 text-gray-400 print:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                              <span className="hidden print:inline mr-1">📍地點：</span>{order.deliveryCity}
+                            </h4>
+                            <p className="text-base text-gray-600 bg-gray-100 p-3 rounded-lg print:bg-transparent print:p-0 print:text-black print:text-base">{order.specificDetails || '未提供詳細地點'}</p>
+                          </div>
+                          
+                          <div className="bg-white p-4 rounded-xl border border-gray-200 text-base shadow-sm print:border-t-2 print:border-gray-800 print:rounded-none print:shadow-none print:p-3 print:mt-2 print:flex-[3] print:min-h-0">
+                            <p className="font-bold text-gray-800 border-b border-gray-100 pb-2 mb-3 text-lg print:border-b-2 print:border-gray-800 print:text-lg print:pb-2 print:mb-3">📦 出貨明細：</p>
+                            <p className="text-gray-700 font-medium whitespace-pre-line leading-loose text-base print:text-black print:text-base print:leading-relaxed">{order.itemsList}</p>
+                            
+                            {order.cart && order.cart['5'] > 0 && (
+                              <div className="mt-4 inline-block bg-blue-50 text-blue-700 font-bold px-4 py-2 rounded-lg border border-blue-200 text-base shadow-sm print:bg-transparent print:border-2 print:border-black print:text-black print:text-base print:mt-4 print:px-3 print:py-1">
+                                🧹 包含租借掃帚 {order.cart['5']} 組
+                              </div>
                             )}
                           </div>
-                          <div className="hidden print:block text-base font-bold text-gray-600 mt-1">
-                            單號：#{order.orderNumber}
-                          </div>
-                        </div>
-                        
-                        {/* 聯絡人資訊 - 固定的基礎高度 */}
-                        <div className="bg-white p-4 rounded-xl border border-gray-200 text-base mb-4 shadow-sm space-y-2 print:border-none print:shadow-none print:p-0 print:mb-4 print:space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-gray-500 text-sm bg-gray-100 px-2 py-1 rounded font-bold print:bg-transparent print:text-gray-800 print:text-base print:p-0">訂購人：</span>
-                            <span className="font-bold text-gray-900 text-lg print:text-lg">{order.ordererName}</span>
-                            <span className="text-gray-600 font-medium print:text-gray-800 print:text-base">({order.ordererPhone})</span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-gray-500 text-sm bg-gray-100 px-2 py-1 rounded font-bold print:bg-transparent print:text-gray-800 print:text-base print:p-0">{isPickup ? '取貨人：' : '收件人：'}</span>
-                            <span className="font-bold text-gray-900 text-lg print:text-lg">{order.recipientName}</span>
-                            <span className="text-gray-600 font-medium print:text-gray-800 print:text-base">({order.recipientPhone})</span>
-                          </div>
-                        </div>
-
-                        {/* 🚀 地點資訊區塊 - 獲得 1 份權重分配 (print:flex-0.5) */}
-                        <div className="mb-4 print:mb-4 print:flex-0.5 print:min-h-0">
-                          <h4 className="font-bold text-gray-800 text-lg mb-1 flex items-center gap-2 print:text-base print:mb-1">
-                            <svg className="w-5 h-5 text-gray-400 print:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                            <span className="hidden print:inline mr-1">📍地點：</span>{order.deliveryCity}
-                          </h4>
-                          <p className="text-base text-gray-600 bg-gray-100 p-3 rounded-lg print:bg-transparent print:p-0 print:text-black print:text-base">{order.specificDetails || '未提供詳細地點'}</p>
-                        </div>
-                        
-                        {/* 🚀 出貨明細區塊 - 佔比調整為 2.5 倍權重 (print:flex-[3]) */}
-                        <div className="bg-white p-4 rounded-xl border border-gray-200 text-base shadow-sm print:border-t-2 print:border-gray-800 print:rounded-none print:shadow-none print:p-3 print:mt-2 print:flex-[3] print:min-h-0">
-                          <p className="font-bold text-gray-800 border-b border-gray-100 pb-2 mb-3 text-lg print:border-b-2 print:border-gray-800 print:text-lg print:pb-2 print:mb-3">📦 出貨明細：</p>
-                          <p className="text-gray-700 font-medium whitespace-pre-line leading-loose text-base print:text-black print:text-base print:leading-relaxed">{order.itemsList}</p>
                           
-                          {order.cart && order.cart['5'] > 0 && (
-                            <div className="mt-4 inline-block bg-blue-50 text-blue-700 font-bold px-4 py-2 rounded-lg border border-blue-200 text-base shadow-sm print:bg-transparent print:border-2 print:border-black print:text-black print:text-base print:mt-4 print:px-3 print:py-1">
-                              🧹 包含租借掃帚 {order.cart['5']} 組
+                          {order.notes && (
+                            <div className="mt-4 text-base font-bold text-red-600 bg-red-50 p-3 rounded-xl border border-red-100 shadow-sm flex items-start gap-2 print:bg-transparent print:border-dashed print:border-2 print:border-black print:text-black print:text-base print:p-3 print:mt-4 print:flex-1 print:min-h-0">
+                              <span className="text-xl print:hidden">⚠️</span> 
+                              <span>備註：{order.notes}</span>
                             </div>
                           )}
                         </div>
-                        
-                        {/* 🚀 備註區塊 - 獲得 1 份權重分配 (print:flex-1) 並加入自動換行撐開 */}
-                        {order.notes && (
-                          <div className="mt-4 text-base font-bold text-red-600 bg-red-50 p-3 rounded-xl border border-red-100 shadow-sm flex items-start gap-2 print:bg-transparent print:border-dashed print:border-2 print:border-black print:text-black print:text-base print:p-3 print:mt-4 print:flex-1 print:min-h-0">
-                            <span className="text-xl print:hidden">⚠️</span> 
-                            <span>備註：{order.notes}</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
