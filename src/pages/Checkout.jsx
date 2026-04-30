@@ -5,7 +5,7 @@ import { products, getMinDate, initialFormData } from '../constants/data';
 import useScrollFadeIn from '../hooks/useScrollFadeIn';
 import CartSummary from '../components/CartSummary';
 
-// 💡 導入我們剛建立的四個專屬步驟子組件
+// 💡 導入步驟子組件
 import Step1Event from '../components/checkout/Step1Event';
 import Step2Location from '../components/checkout/Step2Location';
 import Step3Contact from '../components/checkout/Step3Contact';
@@ -30,7 +30,36 @@ const Checkout = ({
   const [isCheckingDate, setIsCheckingDate] = useState(false);
   const [isSameAsOrderer, setIsSameAsOrderer] = useState(false);
 
-  // 💡 特殊狀態連動邏輯
+  // 💡 智慧提示語狀態
+  const [submitMsg, setSubmitMsg] = useState("系統正在處理您的訂單，請稍候...");
+
+  // ==========================================
+  // ⏳ 智慧載入提示輪播邏輯[cite: 8]
+  // ==========================================
+  useEffect(() => {
+    let interval;
+    if (isSubmitting) {
+      const messages = [
+        "正在將訂單安全地寫入系統中...",
+        "正在為您生成專屬 PDF 訂單明細...",
+        "就快完成了！請務必留在網頁上...",
+        "正在準備發送確認通知...",
+        "感謝您的耐心等待，正在進行最後確認..."
+      ];
+      let counter = 0;
+      setSubmitMsg(messages[0]);
+      
+      interval = setInterval(() => {
+        counter = (counter + 1) % messages.length;
+        setSubmitMsg(messages[counter]);
+      }, 2500); // 每 2.5 秒更換一次語句
+    } else {
+      setSubmitMsg("系統正在處理您的訂單，請稍候...");
+    }
+    return () => clearInterval(interval);
+  }, [isSubmitting]);
+
+  // 💡 特殊狀態連動邏輯[cite: 8]
   useEffect(() => {
     if (isSameAsOrderer && formData.eventType !== 'wedding') {
       setFormData(prev => ({ ...prev, recipientName: prev.ordererName, recipientPhone: prev.ordererPhone }));
@@ -47,7 +76,7 @@ const Checkout = ({
   }, [formData.deliveryCity, formData.eventType]);
 
   // ==========================================
-  // 🧮 指揮中心：金額與物流計算
+  // 🧮 金額與物流計算[cite: 8]
   // ==========================================
   const broomQty = cart[5] || 0; 
   const candyQty = Object.entries(cart).reduce((sum, [id, qty]) => parseInt(id) !== 5 ? sum + qty : sum, 0);
@@ -79,7 +108,7 @@ const Checkout = ({
   const currentCityName = cityMap[formData.deliveryCity] || '請選擇縣市';
 
   // ==========================================
-  // 🎮 指揮中心：行為控制與 API 串接
+  // 🎮 行為控制與 API 串接[cite: 8]
   // ==========================================
   const handleFormChange = (e) => {
     let { name, value } = e.target;
@@ -103,11 +132,11 @@ const Checkout = ({
         const response = await fetch(`${SCRIPT_URL}?action=check_availability&date=${selectedDate}`);
         const result = await response.json();
         if (result.status === 'success' && candyQty > result.remaining) {
-          setAlertMsg(`非常抱歉，為堅持手工新鮮製作的品質，我們每日產能上限為 800 支。您選擇的日期目前剩餘可訂購額度為 ${result.remaining} 支。再麻煩您幫我們微調數量，或選擇其他日期，感謝您的體諒！🍡`);
+          setAlertMsg(`非常抱歉，我們每日產能上限為 800 支。此日期目前剩餘可訂購額度為 ${result.remaining} 支。請微調數量或選擇其他日期，感謝體諒！🍡`);
           return; 
         }
       } catch (error) {
-        setAlertMsg("系統暫時無法核對產能額度，請檢查網路連線或稍後再試。"); return;
+        setAlertMsg("系統暫時無法核對產能額度，請稍後再試。"); return;
       } finally { setIsCheckingDate(false); }
     }
 
@@ -115,22 +144,22 @@ const Checkout = ({
       if (!formData.deliveryCity) { setAlertMsg("請選擇配送縣市。"); return; }
       if (!isLocked) {
          if (!(formData.eventType === 'wedding' ? formData.weddingTime : formData.generalTime)) { setAlertMsg("請選擇收貨時間。"); return; }
-         if (!(formData.eventType === 'wedding' ? formData.weddingAddress : formData.generalAddress)) { setAlertMsg("請填寫詳細路名地址。"); return; }
-         if (!(formData.eventType === 'wedding' ? formData.weddingLocation : formData.generalLocation)) { setAlertMsg("請填寫活動地點名稱。"); return; }
+         if (!(formData.eventType === 'wedding' ? formData.weddingAddress : formData.generalAddress)) { setAlertMsg("請填寫詳細地址。"); return; }
+         if (!(formData.eventType === 'wedding' ? formData.weddingLocation : formData.generalLocation)) { setAlertMsg("請填寫地點名稱。"); return; }
       }
     }
 
     if (currentStep === 3) {
       const phoneRegex = /^[0-9]{10}$/;
       if (formData.eventType === 'wedding') {
-        if (!formData.ordererName || !formData.ordererPhone || !formData.recipientName || !formData.recipientPhone || !formData.recipientName2 || !formData.recipientPhone2) { setAlertMsg("請完整填寫聯絡人與兩位現場代收親友的資訊。"); return; }
-        if (!phoneRegex.test(formData.recipientPhone) || !phoneRegex.test(formData.recipientPhone2)) { setAlertMsg("代收人手機號碼格式錯誤，請輸入完整的 10 位數字。"); return; }
+        if (!formData.ordererName || !formData.ordererPhone || !formData.recipientName || !formData.recipientPhone || !formData.recipientName2 || !formData.recipientPhone2) { setAlertMsg("請完整填寫收貨資訊。"); return; }
+        if (!phoneRegex.test(formData.recipientPhone) || !phoneRegex.test(formData.recipientPhone2)) { setAlertMsg("手機號碼格式錯誤。"); return; }
       } else {
         if (!formData.ordererName || !formData.ordererPhone || !formData.recipientName || !formData.recipientPhone) { setAlertMsg("請完整填寫聯絡資訊。"); return; }
-        if (!phoneRegex.test(formData.recipientPhone)) { setAlertMsg("收貨人聯絡電話格式錯誤，請輸入完整的 10 位數字。"); return; }
+        if (!phoneRegex.test(formData.recipientPhone)) { setAlertMsg("收貨人電話格式錯誤。"); return; }
       }
-      if (!phoneRegex.test(formData.ordererPhone)) { setAlertMsg("訂購人手機號碼格式錯誤，請輸入完整的 10 位數字。"); return; }
-      if (formData.ordererEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.ordererEmail)) { setAlertMsg("電子信箱格式錯誤，請輸入有效的 Email。"); return; }
+      if (!phoneRegex.test(formData.ordererPhone)) { setAlertMsg("訂購人電話格式錯誤。"); return; }
+      if (formData.ordererEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.ordererEmail)) { setAlertMsg("信箱格式錯誤。"); return; }
     }
     
     setCurrentStep(prev => prev + 1);
@@ -181,17 +210,21 @@ const Checkout = ({
   };
 
   // ==========================================
-  // 🖼️ 指揮中心：UI 渲染組合
+  // 🖼️ UI 渲染組合[cite: 8]
   // ==========================================
   return (
     <>
-      {/* 載入中遮罩 (保持不變) */}
+      {/* 💡 智慧載入遮罩[cite: 8] */}
       {(isSubmitting || isCheckingDate) && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-darkWood/60 backdrop-blur-sm transition-opacity">
           <div className="bg-pureWhite p-8 md:p-10 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm w-[90%] mx-auto text-center animate-[fadeIn_0.3s_ease-out]">
             <svg className="animate-spin h-14 w-14 text-amberRed mb-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            <h3 className="text-xl md:text-2xl font-bold text-darkWood mb-3 tracking-wider font-serif">{isCheckingDate ? "核對產能中" : "訂單處理中"}</h3>
-            <p className="text-sm md:text-base text-darkWood/80 leading-relaxed font-medium">{isCheckingDate ? "正在為您確認當日可製作額度..." : "系統正在處理您的訂單，請稍候..."}</p>
+            <h3 className="text-xl md:text-2xl font-bold text-darkWood mb-3 tracking-wider font-serif">
+              {isCheckingDate ? "核對產能中" : "訂單處理中"}
+            </h3>
+            <p className="text-sm md:text-base text-darkWood/80 leading-relaxed font-medium min-h-[3rem]">
+              {isCheckingDate ? "正在為您確認當日可製作額度..." : submitMsg}
+            </p>
           </div>
         </div>
       )}
@@ -212,17 +245,13 @@ const Checkout = ({
         </div>
 
         <main className="flex flex-col lg:flex-row gap-8 items-start">
-          {/* 左側購物車摘要 */}
           <CartSummary 
             cart={cart} updateCart={updateCart} handleQuantityChange={handleQuantityChange} navigateTo={navigateTo}
             candyQty={candyQty} broomQty={broomQty} candySubtotal={candySubtotal} broomRent={broomRent}
             broomDeposit={broomDeposit} shippingFee={shippingFee} shippingHint={shippingHint} totalPrice={totalPrice}
           />
 
-          {/* 右側表單區塊 (動態渲染子組件) */}
           <section className="w-full lg:w-7/12 bg-pureWhite/65 backdrop-blur-[12px] border border-pureWhite shadow-xl rounded-2xl p-6 md:p-8">
-            
-            {/* 💡 乾淨俐落的子組件調度 */}
             {currentStep === 1 && <Step1Event formData={formData} handleFormChange={handleFormChange} getMinDate={getMinDate} />}
             {currentStep === 2 && <Step2Location formData={formData} handleFormChange={handleFormChange} />}
             {currentStep === 3 && <Step3Contact formData={formData} handleFormChange={handleFormChange} isSameAsOrderer={isSameAsOrderer} setIsSameAsOrderer={setIsSameAsOrderer} />}
@@ -234,14 +263,13 @@ const Checkout = ({
               />
             )}
 
-            {/* 底部導覽按鈕 */}
             <div className="mt-10 flex gap-4">
               {currentStep > 1 && (
                 <button type="button" onClick={prevStep} disabled={isSubmitting || isCheckingDate} className="flex-1 py-4 px-6 rounded-xl font-bold border-2 border-warmWood/30 text-darkWood/60 hover:bg-creamBg transition-all">上一步</button>
               )}
               {currentStep < 4 ? (
                 <button type="button" onClick={nextStep} disabled={isCheckingDate} className="flex-[2] bg-amberRed text-white py-4 px-6 rounded-xl font-bold shadow-lg hover:bg-darkWood transition-all flex items-center justify-center gap-2">
-                  {isCheckingDate ? <><svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 核對中...</> : "繼續下一步"}
+                  {isCheckingDate ? "核對中..." : "繼續下一步"}
                 </button>
               ) : (
                 <button type="button" onClick={handleSubmitOrder} disabled={isSubmitting || candyQty < 50} className="flex-[2] bg-emerald-600 text-white py-4 px-6 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-all">確認並送出訂單</button>

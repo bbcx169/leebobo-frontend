@@ -105,8 +105,34 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
         <h2 className="text-3xl md:text-4xl font-bold text-[#3E2723] mb-4 font-serif">訂單已成功送出！</h2>
         <p className="text-[#3E2723]/70 text-lg mb-8">感謝您的訂購，專人將盡快與您聯繫確認訂單細節。</p>
 
-        <div className="bg-[#06C755]/10 border border-[#06C755]/30 text-[#06C755] p-4 rounded-xl text-sm font-bold mb-8 flex items-center justify-center gap-3">
+        <div className="bg-[#06C755]/10 border border-[#06C755]/30 text-[#06C755] p-4 rounded-xl text-sm font-bold mb-0 flex items-center justify-center gap-3">
             ✅ 訂單已成功寫入系統！{submittedOrder.payload?.ordererEmail ? '明細已自動寄送至您的信箱。' : '您可以點擊下方按鈕下載或寄送 PDF 留存。'}
+        </div>
+      </div>
+
+      {/* --- 💡 LINE 強制導流區塊 (已上移) --- */}
+      <div className="mb-12">
+        <p className="text-[#3E2723]/80 text-base mb-6 text-center">
+          <span className="text-[#A52A2A] font-bold inline-block">請務必加入 LINE 官方帳號留言，以利後續聯繫與確認訂單唷！</span>
+        </p>
+        
+        <div className="bg-gradient-to-br from-[#FAF7F2] to-[#D2B48C]/30 border border-[#D2B48C]/50 rounded-2xl p-6 md:p-8 max-w-md mx-auto shadow-sm relative overflow-hidden text-center">
+          <h3 className="text-xl md:text-2xl font-bold text-[#A52A2A] mb-2 tracking-wide font-serif">🎁 加入 LINE 官方帳號</h3>
+          <p className="text-[#3E2723]/80 font-medium mb-6">立刻領取專屬優惠券！</p>
+          <img 
+            src="https://qr-official.line.me/gs/M_687vjdlz_GW.png?oat_content=qr" 
+            alt="LINE 官方帳號 QR Code" 
+            className="w-40 h-40 md:w-48 md:h-48 object-contain mx-auto mb-6 bg-white p-2 rounded-xl shadow-sm border border-white/50" 
+            loading="lazy" 
+          />
+          <a 
+            href="https://lin.ee/5QYll8k" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="inline-flex items-center justify-center gap-2 w-full bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-lg py-3.5 px-6 rounded-xl shadow-md transition-transform hover:-translate-y-1"
+          >
+            點此加入好友
+          </a>
         </div>
       </div>
 
@@ -147,7 +173,6 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
                 placeholder="例如：yourname@example.com"
                 className="w-full px-4 py-3 rounded-lg border border-[#D2B48C]/50 focus:outline-none focus:ring-2 focus:ring-[#A52A2A] bg-white text-[#3E2723]"
               />
-              {/* 💡 這裡就是修改為綠色的按鈕 */}
               <button 
                 onClick={handleSendEmail}
                 disabled={emailStatus === 'loading' || !emailAddress}
@@ -162,21 +187,7 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
         )}
       </div>
 
-      <hr className="border-[#D2B48C]/30 mb-8" />
-
-      <p className="text-[#3E2723]/80 text-base mb-6 text-center"><span className="text-[#A52A2A] font-bold inline-block">請務必加入 LINE 官方帳號留言，以利後續聯繫與確認訂單唷！</span></p>
-      
-      {/* --- LINE 強制導流區塊 --- */}
-      <div className="bg-gradient-to-br from-[#FAF7F2] to-[#D2B48C]/30 border border-[#D2B48C]/50 rounded-2xl p-6 md:p-8 max-w-md mx-auto shadow-sm relative overflow-hidden text-center">
-        <h3 className="text-xl md:text-2xl font-bold text-[#A52A2A] mb-2 tracking-wide font-serif">🎁 加入 LINE 官方帳號</h3>
-        <p className="text-[#3E2723]/80 font-medium mb-6">立刻領取專屬優惠券！</p>
-        <img src="https://qr-official.line.me/gs/M_687vjdlz_GW.png?oat_content=qr" alt="LINE 官方帳號 QR Code" className="w-40 h-40 md:w-48 md:h-48 object-contain mx-auto mb-6 bg-white p-2 rounded-xl shadow-sm border border-white/50" loading="lazy" />
-        <a href="https://lin.ee/5QYll8k" target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 w-full bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-lg py-3.5 px-6 rounded-xl shadow-md transition-transform hover:-translate-y-1">
-          點此加入好友
-        </a>
-      </div>
-
-      <div className="mt-10">
+      <div className="mt-12">
         <button onClick={() => handleNavigate('list')} className="text-[#D2B48C] font-bold hover:text-[#A52A2A] transition-colors flex items-center justify-center gap-2 mx-auto tracking-widest">
           ← 返回選購繼續逛逛
         </button>

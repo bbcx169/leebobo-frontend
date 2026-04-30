@@ -81,18 +81,6 @@
       color: #2563EB;
       border: 1px solid #DBEAFE; 
     }
-
-    /* --- 新增的頁尾 Logo 樣式 --- */
-    .footer-logo-container {
-      text-align: center;
-      margin-top: 30px;
-      padding-top: 20px;
-      border-top: 1px solid #E6D5C3; /* 加一條分隔線 */
-    }
-    .footer-logo-container img {
-      max-height: 100px; /* 設定 logo 最大高度，可依需求調整 */
-      width: auto;
-    }
   </style>
 </head>
 <body>
@@ -131,7 +119,7 @@
       </tr>
       <? if (data.ordererEmail) { ?>
         <tr><td class="label">電子信箱</td><td class="value"><?= data.ordererEmail ?></td></tr>
-      <? } ?>
+      } ?>
       
       <?!= recipientHtml ?>
       
@@ -191,10 +179,6 @@
            <td><span style="font-weight: bold; color: #888888;">營業時間：</span>18:00 ~ 23:00</td>
          </tr>
        </table>
-    </div>
-
-    <div class="footer-logo-container">
-      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAArwAAAGmCAYAAAA8WfR6AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAFiUAABYlAUlSJPAAAABhaVRYdFhNTDpjb20uYWRvYmUueG1wAAAAAAA8P3hwYWNrZXQgYmVnaW49Iu+7vyIgaWQ9Ilc1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCI/Pgo8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJBZG9iZSBYTVAgQ29yZSA3LjEtYzAwMCA3OS40YTZhYTQ5ZGEsIDIwMjIvMDYvMjEtMTY6NzA6NDIgICAgICAgICI+CiA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPgogIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiCiAgICB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iCiAgICB4bWxuczpdkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iCiAgICB4bWxuczpwaG90b3Nob3A9Imh0dHA6Ly9ucy5hZG9iZS5jb20vcGhvdG9zaG9wLzEuMC8iCiAgICB4bWxuczpleGlmPSJodHRwOi8vbnMuYWRvYmUuY290L2V4aWYvMS4wLyIKICAgIHhtbG5zOnRpZmY9Imh0dHA6Ly9ucy5hZG9iZS5jb20vdGlmZi8xLjAvIgogICAgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgMjMuNCAoV2luZG93cykiCiAgICB4bXA6Q3JlYXRlRGF0ZT0iMjAyNC0wOC0yNVQxNDoyOTo0OCswODowMCIKICAgIHhwOk1ldGFkYXRhRGF0ZT0iMjAyNC0wOC0yNVQxNDoyOTo0OCswODowMCIKICAgIHhwOk1vZGlmeURhdGU9IjIwMjQtMDgtMjVUMTQ6Mjk6NDgrMDg6MDAiCiAgICBkYzpmb3JtYXQ9ImltYWdlL3BuZyIKICAgIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiCiAgICBwaG90b3Nob3A6SUNDUHJvZmlsZT0ic1JHQiBJRUM2MTk2Ni0yLjEiCiAgICBleGlmOlBpeGVsWFZpZW5zaW9uPSIxMDgwIgogICAgZXhpZjpQaXhlbFlEaW1lbnNpb249IjEwODAiCiAgICBleGlmOkNvbG9yU3BhY2U9IjEiCiAgICB0aWZmOk9yaWVudGF0aW9uPSIxIndpZmY6WFJlc29sdXRpb249IjcyLzEiCiAgICB0aWZmOlJlc29sdXRpb25Vbml0PSIyIj4KICAgPHBkZjpSREY+CiAgICA8cmRmOlNlcT4KICAgICA8cmRmOmxpPmh0dHBzOi8vd3d3LmZyZWVpa21nLmNvbS9wbmcvMjMwMjU1Mi88L3JkZjpsaT4KICAgICA8cmRmOmxpPjwvcmRmOmxpPgogICAgPC9yZGY6U2VxPgogICA8L2RjOnNvdXJjZT4    PC9yZGY6RGVzY3JpcHRpb24+CiA8L3JkZjpSREY+CjwveDp4bXBtZXRhPgo8P3hwYWNrZXQgZW5kPSJyIj8+D5U6kQAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAFiUAABYlAUlSJPAAAAViSURBVHhe7d0xbtNAFMfxLSAUFJRcACk5ABISRU4AFBTcwAWg5AZU7oCY4AJQUHABLgApKCnwEzgC6m5KbsAFuABSUqKi7+I/HuvY42fHe2Y2Znd/T9K6b6K52e//b+eb4UfN/6NfX3//fP78vOqXF28vFm+H6wEAAAAA4LpYPF8pAAAAAACuDwEQAAAAAIApCIAAAAAAAEwBCEAAAAAAGIuRBAAAAAAApDArIADAmI3f3Pz8fN5/4+7P3P/3+Yv49y7Gf13r/T9Z+nve3G9V/Hw6m76Y9//89bWwR/u9Zf9/M//6wU7m+/V4v7F4b+X9f5X/nI63H2p/dG/v/Yv5r6pYPrp37P/5vP+V8V/v9/6+1ntu+Tux4v8291v1893X+Yt5f3fv//l4Gv/+/f9r/l8W7fVev5j3b+7f7vffzL/+/v+t/7w+vtd+z9V+fWfX90rR76v9//t4j/E+N9rvLca/L/pfqfrXW4x97vO9U+/5Kfr9tf4/i/6f9/4/5b+q4q6P9x/f19P4u6fW/98e578o+tePfr+u/T5d19/+t9N+X4p9b+/9u/7u9/qXw3v8r44X9/b/N4W/e7rv3+K+ntbfv+vve+H77Wz8+/X+/8NxfP+NvtZ3p/69U/j++p/reOvvxve5Xw+l6Hvf6//D//6n4P/i6YOfO97++57XvxuO75Pj43/mO7b++u7Y+n+/1p8d35/v98d+/u+jX7wXf+8Uf9++vxOPr7f4/pP6e4t9fvvebYxX9PNr7X9vH2/x39u/4p4f9W578Vb3G/25Zf7vxfd+Wbwn7V//7ff+M40+FzE+t8T9qP8U76u17fW7Y65v/7eL63vG/49xfH9Y//rE54v+3GP8f/u/ff+q3xH9uRfjPcV9iPsV4/m6f43xfuLveW/865/HeO4V5//G4uN0/fVfvL8/Vof5vR3f10X7f4fjfHw/9/U35uXj++H+f2O89/H9f/j4v/p+/+GvHff1p/L+M43+Xf/8K/Z59v/mFfvVv59N+9/b/D+Kff6P6/+9+vX4WjQ+h77W/P9X4/8Xb3W//Rbj/3pcf25/Ph/6/eL/0/f4/Gv5f//+M40+X9Zf3w/95/Wfv67/ffj87mP+b/v158O5f+Mv9qPPv4rxL/p4X//18d60v+Y9xf8X7fV/vN7rD32u75m6/hP//4u96f0b/369V9/4u0f//bOvvz89r79H5//5uL/+O/X8X+rzrL+H9b/v6V7p+T1e+n5//fVf//0rv+fL499P7//P/uUq//+z+vt0vN8p7u/Wf18U/W7fH5V+X8f//8v8L3p//u45f/2/mP/fPZ9N+t+7Xn9v5v/fR5//L+b/bvf9L/rfq877b+b/Ydf9rvF+X6u7bteb9/h//f5r2b/++4v/n/5u6v5V8T9S9Hsq+reK/vU2Xp+Cfv9+72n9vb1//Zl6fx/Xv4/8tXjP7b//Y/XbOfrvNcb7XOz/4v7//vXfXfTfR7//K9b9eD8X/e6L/e5b/+9b//5X7v875f+n7b82H/s8x39P/ev9XHz/5/m/68/F99/H+O8Y5/M5n8PnfM4/6/N537+7f+/P/vX5bOpXjP59m4vjM34+fW++f+v9N/ev/b6Z/+ft3789//fivV/q/q/G6/P9N73/4v9f49+369/v6Xj46/t7Kve4j/Fv/evv78759z/6fX25+vtH/b+n5+fr/h9+79v/26u7Hov++vUv9u8X5//z//4/xX+/bOfP6T//v969//X5++3xvePrb4/P5fT9VOf8f49Xf//b//9S9v6e//Of37+X273+/fv5efv7+P3/O//w/t18f5/eX5/fP///9S//////8H/+79P78/fX6f9//8//X//6f98f5Xv5+/38e//r//////+vr5+vr5//////9////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................AAAA//8DAOmGf30H2Vf5AAAAAElFTkSuQmCC" alt="工作室Logo">
     </div>
   </div>
 </body>

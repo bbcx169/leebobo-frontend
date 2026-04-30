@@ -20,7 +20,7 @@ const Step4Confirm = ({
   const currentCityName = cityMap[formData.deliveryCity] || '請選擇縣市';
   const isLocked = formData.deliveryCity === 'pickup';
 
-  // 💡 內聚顯示邏輯 2：明細列渲染函數
+  // 💡 內聚顯示邏輯 2：明細列渲染函數[cite: 9]
   const renderDetailRow = (label, value) => (
     <React.Fragment>
       <span className="text-darkWood/60 font-medium">{label}</span>
@@ -38,7 +38,7 @@ const Step4Confirm = ({
       
       <div className="bg-white p-6 rounded-2xl border border-warmWood/30 shadow-sm space-y-6 text-sm">
         
-        {/* 💡 顧問優化：交貨方式視覺標籤 (加上 SVG 圖示並對齊) */}
+        {/* 💡 交貨方式視覺標籤[cite: 9] */}
         <div className="space-y-3 pt-2">
           <h3 className="text-base font-bold text-amberRed border-b border-warmWood/20 pb-2 flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -59,7 +59,7 @@ const Step4Confirm = ({
           </div>
         </div>
 
-        {/* 區塊 1：活動資訊 (加上 SVG 圖示並對齊) */}
+        {/* 區塊 1：活動資訊[cite: 9] */}
         <div className="space-y-3 pt-2">
           <h3 className="text-base font-bold text-amberRed border-b border-warmWood/20 pb-2 flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -85,7 +85,7 @@ const Step4Confirm = ({
           </div>
         </div>
 
-        {/* 區塊 2：聯絡資訊 (加上 SVG 圖示並對齊) */}
+        {/* 區塊 2：聯絡資訊[cite: 9] */}
         <div className="space-y-3 pt-2">
           <h3 className="text-base font-bold text-amberRed border-b border-warmWood/20 pb-2 flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,7 +110,7 @@ const Step4Confirm = ({
           </div>
         </div>
 
-        {/* 區塊 3：購買明細 */}
+        {/* 區塊 3：購買明細[cite: 9] */}
         <div className="bg-creamBg/50 p-5 rounded-xl border border-warmWood/20">
           <h3 className="text-base font-bold text-darkWood border-b border-warmWood/20 pb-2 mb-3">購買明細</h3>
           <div className="space-y-3 mb-4">
