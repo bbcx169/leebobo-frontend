@@ -3,7 +3,6 @@
  * 李伯伯糖葫蘆 - 資料庫服務 (DatabaseService.gs)
  * ==========================================
  * 此檔案封裝所有對 Google Sheets 的讀取與寫入操作。
- * 其他服務只需呼叫此處的方法，無需關心底層試算表的欄位細節。
  */
 
 const DatabaseService = {
@@ -36,7 +35,6 @@ const DatabaseService = {
           try {
             let cartObj = JSON.parse(cartStr);
             for (let id in cartObj) {
-              // 排除掃帚(id='5')，只計算糖葫蘆數量
               if (id !== '5' && cartObj[id] > 0) {
                 totalCandies += parseInt(cartObj[id], 10);
               }
@@ -48,118 +46,135 @@ const DatabaseService = {
     return totalCandies;
   },
 
-  // 儲存新訂單
+  // 🚀 儲存新訂單 (已加入 LockService 確保併發安全)
   saveNewOrder: function(data, pdfUrl) {
-    const sheet = this.getMainSheet();
-    
-    // 確保表頭存在
-    if (sheet.getLastRow() === 0) {
-      const headers = ["訂單建立日期", "訂單建立時間", "訂購明細單編號", "訂購人", "訂購人電話", "收貨人", "收貨人電話", "配送縣市", "活動類型", "活動日期", "活動時間", "詳細資訊 (地點名稱與地址)", "訂購明細", "糖葫蘆小計", "掃帚租金", "掃帚押金", "運費", "總金額", "備註", "聯絡信箱", "購物車原始資料", "PDF下載連結", "是否修改過"];
-      sheet.appendRow(headers);
-      sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#F3F4F6");
-      sheet.setFrozenRows(1);
-    }
+    const lock = LockService.getScriptLock();
+    try {
+      // 嘗試取得鎖，最多等待 10 秒
+      lock.waitLock(10000);
 
-    const rowData = [
-      data.orderDate || "", 
-      data.orderTime || "", 
-      data.orderNumber || "", 
-      data.ordererName || "", 
-      data.ordererPhone ? "'" + data.ordererPhone : "", 
-      data.recipientName || "", 
-      data.recipientPhone ? "'" + data.recipientPhone : "", 
-      data.deliveryCity || "", 
-      data.eventType || "", 
-      data.eventDate || "", 
-      data.eventTime || "", 
-      data.specificDetails || "", 
-      data.itemsList || "", 
-      data.candyTotal || 0, 
-      data.broomRent || 0, 
-      data.broomDeposit || 0, 
-      data.shippingFee || 0, 
-      data.totalAmount || "", 
-      data.notes || "", 
-      data.ordererEmail || "", 
-      JSON.stringify(data.cart || {}), 
-      pdfUrl || "", 
-      ""
-    ];
-    
-    sheet.appendRow(rowData);
-    return sheet.getLastRow(); // 回傳新行號
+      const sheet = this.getMainSheet();
+      
+      // 確保表頭存在
+      if (sheet.getLastRow() === 0) {
+        const headers = ["訂單建立日期", "訂單建立時間", "訂購明細單編號", "訂購人", "訂購人電話", "收貨人", "收貨人電話", "配送縣市", "活動類型", "活動日期", "活動時間", "詳細資訊 (地點名稱與地址)", "訂購明細", "糖葫蘆小計", "掃帚租金", "掃帚押金", "運費", "總金額", "備註", "聯絡信箱", "購物車原始資料", "PDF下載連結", "是否修改過"];
+        sheet.appendRow(headers);
+        sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#F3F4F6");
+        sheet.setFrozenRows(1);
+      }
+
+      const rowData = [
+        data.orderDate || "", 
+        data.orderTime || "", 
+        data.orderNumber || "", 
+        data.ordererName || "", 
+        data.ordererPhone ? "'" + data.ordererPhone : "", 
+        data.recipientName || "", 
+        data.recipientPhone ? "'" + data.recipientPhone : "", 
+        data.deliveryCity || "", 
+        data.eventType || "", 
+        data.eventDate || "", 
+        data.eventTime || "", 
+        data.specificDetails || "", 
+        data.itemsList || "", 
+        data.candyTotal || 0, 
+        data.broomRent || 0, 
+        data.broomDeposit || 0, 
+        data.shippingFee || 0, 
+        data.totalAmount || "", 
+        data.notes || "", 
+        data.ordererEmail || "", 
+        JSON.stringify(data.cart || {}), 
+        pdfUrl || "", 
+        ""
+      ];
+      
+      sheet.appendRow(rowData);
+      return sheet.getLastRow();
+
+    } catch (e) {
+      console.error("saveNewOrder Error: " + e.toString());
+      throw new Error("系統繁忙或發生錯誤，無法存入訂單。");
+    } finally {
+      // 釋放鎖，讓下一個請求可以進入
+      lock.releaseLock();
+    }
   },
 
-  // 修改訂單 (時間/日期/備註)
+  // 🚀 修改訂單 (已加入 LockService 確保更新時不被其他程序覆蓋)
   updateOrder: function(orderNumber, newDate, newTime, newDetails, newNotes, newPdfUrl) {
-    const sheet = this.getMainSheet();
-    const dataRows = sheet.getDataRange().getValues();
-    let targetRowIndex = -1;
-    
-    // 從後面找比較快，因為要找最新的訂單
-    for (let i = dataRows.length - 1; i >= 1; i--) {
-      if (dataRows[i][2] === orderNumber) { 
-        targetRowIndex = i + 1;
-        break; 
-      }
-    }
+    const lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(10000);
 
-    if (targetRowIndex !== -1) {
-      // 更新日期時間
-      sheet.getRange(targetRowIndex, 10).setValue(newDate);
-      sheet.getRange(targetRowIndex, 11).setValue(newTime);
+      const sheet = this.getMainSheet();
+      const dataRows = sheet.getDataRange().getValues();
+      let targetRowIndex = -1;
       
-      let updatedDetails = dataRows[targetRowIndex - 1][11];
-      if (newDetails !== undefined) {
-        updatedDetails = newDetails;
-        sheet.getRange(targetRowIndex, 12).setValue(updatedDetails);
+      for (let i = dataRows.length - 1; i >= 1; i--) {
+        if (dataRows[i][2] === orderNumber) { 
+          targetRowIndex = i + 1;
+          break; 
+        }
       }
 
-      let finalNotes = dataRows[targetRowIndex - 1][18];
-      if (newNotes !== undefined) {
-        finalNotes = newNotes;
-        sheet.getRange(targetRowIndex, 19).setValue(finalNotes);
-      }
+      if (targetRowIndex !== -1) {
+        sheet.getRange(targetRowIndex, 10).setValue(newDate);
+        sheet.getRange(targetRowIndex, 11).setValue(newTime);
+        
+        let updatedDetails = dataRows[targetRowIndex - 1][11];
+        if (newDetails !== undefined) {
+          updatedDetails = newDetails;
+          sheet.getRange(targetRowIndex, 12).setValue(updatedDetails);
+        }
 
-      // 標記為已修改
-      sheet.getRange(targetRowIndex, 23).setValue("TRUE");
-      
-      // 更新 PDF 網址
-      if(newPdfUrl) {
-        sheet.getRange(targetRowIndex, 22).setValue(newPdfUrl);
-      }
+        let finalNotes = dataRows[targetRowIndex - 1][18];
+        if (newNotes !== undefined) {
+          finalNotes = newNotes;
+          sheet.getRange(targetRowIndex, 19).setValue(finalNotes);
+        }
 
-      // 回傳更新後的完整該行資料，方便後續重建 PDF
-      const rowData = sheet.getRange(targetRowIndex, 1, 1, 23).getValues()[0];
-      return {
-        orderDate: rowData[0] instanceof Date ? Utilities.formatDate(rowData[0], "GMT+8", "yyyy/MM/dd") : rowData[0],
-        orderTime: rowData[1] instanceof Date ? Utilities.formatDate(rowData[1], "GMT+8", "HH:mm:ss") : rowData[1],
-        orderNumber: rowData[2], 
-        ordererName: rowData[3], 
-        ordererPhone: String(rowData[4]).replace(/^'/, ''),
-        recipientName: rowData[5], 
-        recipientPhone: String(rowData[6]).replace(/^'/, ''), 
-        deliveryCity: rowData[7],
-        eventType: rowData[8], 
-        eventDate: newDate, 
-        eventTime: newTime, 
-        specificDetails: updatedDetails, 
-        itemsList: rowData[12], 
-        candyTotal: rowData[13], 
-        broomRent: rowData[14], 
-        broomDeposit: rowData[15],
-        shippingFee: rowData[16], 
-        totalAmount: rowData[17], 
-        notes: finalNotes, 
-        ordererEmail: rowData[19],
-        cart: rowData[20] ? JSON.parse(rowData[20]) : {},
-        isModified: true
-      };
+        sheet.getRange(targetRowIndex, 23).setValue("TRUE");
+        if(newPdfUrl) {
+          sheet.getRange(targetRowIndex, 22).setValue(newPdfUrl);
+        }
+
+        const rowData = sheet.getRange(targetRowIndex, 1, 1, 23).getValues()[0];
+        return {
+          orderDate: rowData[0] instanceof Date ? Utilities.formatDate(rowData[0], "GMT+8", "yyyy/MM/dd") : rowData[0],
+          orderTime: rowData[1] instanceof Date ? Utilities.formatDate(rowData[1], "GMT+8", "HH:mm:ss") : rowData[1],
+          orderNumber: rowData[2], 
+          ordererName: rowData[3], 
+          ordererPhone: String(rowData[4]).replace(/^'/, ''),
+          recipientName: rowData[5], 
+          recipientPhone: String(rowData[6]).replace(/^'/, ''), 
+          deliveryCity: rowData[7],
+          eventType: rowData[8], 
+          eventDate: newDate, 
+          eventTime: newTime, 
+          specificDetails: updatedDetails, 
+          itemsList: rowData[12], 
+          candyTotal: rowData[13], 
+          broomRent: rowData[14], 
+          broomDeposit: rowData[15],
+          shippingFee: rowData[16], 
+          totalAmount: rowData[17], 
+          notes: finalNotes, 
+          ordererEmail: rowData[19],
+          cart: rowData[20] ? JSON.parse(rowData[20]) : {},
+          isModified: true
+        };
+      }
+      return null;
+    } catch (e) {
+      console.error("updateOrder Error: " + e.toString());
+      throw new Error("更新訂單失敗。");
+    } finally {
+      lock.releaseLock();
     }
-    return null; // 找不到訂單
   },
 
-  // 取得所有訂單 (供後台使用)
+  // 取得所有訂單
   getAllOrders: function() {
     const sheet = this.getMainSheet();
     const lastRow = sheet.getLastRow();
@@ -172,7 +187,6 @@ const DatabaseService = {
       const r = dataRows[i];
       const safeDate = v => v instanceof Date ? Utilities.formatDate(v, "GMT+8", "yyyy-MM-dd") : v;
       const safeTime = v => v instanceof Date ? Utilities.formatDate(v, "GMT+8", "HH:mm") : v;
-      
       orders.push({
         orderDate: r[0] instanceof Date ? Utilities.formatDate(r[0], "GMT+8", "yyyy/MM/dd") : r[0],
         orderTime: r[1] instanceof Date ? Utilities.formatDate(r[1], "GMT+8", "HH:mm:ss") : r[1],
@@ -202,7 +216,7 @@ const DatabaseService = {
     return orders;
   },
 
-  // 查詢特定訂單 (供前台查詢使用)
+  // 查詢特定訂單
   queryOrder: function(name, phone, date) {
     const sheet = this.getMainSheet();
     const lastRow = sheet.getLastRow();
@@ -267,32 +281,29 @@ const DatabaseService = {
   // 年度封存舊訂單
   autoArchiveOldOrdersByYear: function() {
     const ss = SpreadsheetApp.getActiveSpreadsheet(); 
-    const sourceSheet = this.getMainSheet(); 
+    const sourceSheet = this.getMainSheet();
     if (!sourceSheet) return;
     
     const lastRow = sourceSheet.getLastRow(); 
     if (lastRow <= 1) return;
-    
     const data = sourceSheet.getRange(2, 1, lastRow - 1, sourceSheet.getLastColumn()).getValues();
     const today = new Date(); 
-    const oneYearAgo = new Date(); 
+    const oneYearAgo = new Date();
     oneYearAgo.setFullYear(today.getFullYear() - 1);
     
     const archiveGroups = {}; 
     const rowsToKeep = [];
-    
     for (let i = 0; i < data.length; i++) {
-      const row = data[i]; 
+      const row = data[i];
       const orderDateVal = row[0]; 
       const orderDate = orderDateVal instanceof Date ? orderDateVal : new Date(orderDateVal);
-      
       if (orderDate < oneYearAgo) {
-        const year = orderDate.getFullYear(); 
+        const year = orderDate.getFullYear();
         const sheetName = "封存_" + year;
         if (!archiveGroups[sheetName]) archiveGroups[sheetName] = [];
         archiveGroups[sheetName].push(row);
       } else { 
-        rowsToKeep.push(row); 
+        rowsToKeep.push(row);
       }
     }
     
