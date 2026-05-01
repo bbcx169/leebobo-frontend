@@ -18,7 +18,7 @@ export default function AdminModals({
   onResendPDF
 }) {
 
-  // 💡 顧問優化：解析原始 location 字串，拆分為地點名稱與地址
+  // 💡 顧問優化：解析原始 specificDetails 字串，拆分為地點名稱與地址
   // 邏輯：從 "地點：XXX\n地址：YYY" 格式中提取內容
   const parseLocation = (rawStr = '') => {
     const locMatch = rawStr.match(/地點：(.*?)(?:\n|$)/);
@@ -31,7 +31,8 @@ export default function AdminModals({
     };
   };
 
-  const { locName, addrValue } = parseLocation(editModal?.location);
+  // 🚀 修正：將屬性名稱從 location 改為 specificDetails，確保與後端對接
+  const { locName, addrValue } = parseLocation(editModal?.specificDetails);
 
   // 💡 顧問優化：當使用者修改拆分欄位時，自動合併為 GAS 標籤格式
   const handleLocationPartChange = (type, value) => {
@@ -39,11 +40,11 @@ export default function AdminModals({
     let newAddrValue = type === 'addrValue' ? value : addrValue;
     
     // 合併為標準格式：地點：[內容]\n地址：[內容]
-    const formattedLocation = `地點：${newLocName}\n地址：${newAddrValue}`;
+    const formattedDetails = `地點：${newLocName}\n地址：${newAddrValue}`;
     
     setEditModal({
       ...editModal,
-      location: formattedLocation
+      specificDetails: formattedDetails
     });
   };
 
@@ -67,7 +68,7 @@ export default function AdminModals({
         </div>
       )}
 
-      {/* 2. 修改訂單資訊 Modal (優化版：拆分地址標籤) */}
+      {/* 2. 修改訂單資訊 Modal (修正版：將欄位名稱與資料庫 specificDetails 同步) */}
       {editModal?.isOpen && (
         <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl border border-gray-100 animate-[fadeIn_0.2s_ease-out]">
@@ -100,7 +101,7 @@ export default function AdminModals({
                 </div>
               </div>
 
-              {/* 🚀 顧問優化：拆分地點名稱 */}
+              {/* 🚀 拆分地點名稱 */}
               <div>
                 <label className="block text-xs font-bold text-gray-400 mb-1">地點名稱 (餐廳/門市/大樓)</label>
                 <input 
@@ -112,7 +113,7 @@ export default function AdminModals({
                 />
               </div>
 
-              {/* 🚀 顧問優化：拆分詳細地址 */}
+              {/* 🚀 拆分詳細地址 */}
               <div>
                 <label className="block text-xs font-bold text-gray-400 mb-1">詳細地址</label>
                 <input 
@@ -138,7 +139,7 @@ export default function AdminModals({
             
             <div className="flex gap-3">
               <button 
-                onClick={() => setEditModal({ isOpen: false, order: null, eventDate: '', eventTime: '', location: '', notes: '' })} 
+                onClick={() => setEditModal({ isOpen: false, order: null, eventDate: '', eventTime: '', specificDetails: '', notes: '' })} 
                 className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors"
               >
                 取消

@@ -14,7 +14,7 @@ const OrderProcess = ({ navigateTo }) => {
             id: 1, 
             title: "挑選品項", 
             // 💡 修正：更新文字內容
-            desc: ["選擇經典或婚禮系列", "確認商品口味與數量", "店家每日產能上限 800 支"], 
+            desc: ["確認商品口味與數量", "每日產能上限 800 支"], 
             icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg> 
         },
         { id: 2, title: "確認門檻", desc: ["最低起訂量 50 支", "活動日前 14 天預訂"], icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> },
