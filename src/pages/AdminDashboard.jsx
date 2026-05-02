@@ -47,7 +47,7 @@ export default function AdminDashboard() {
     order: null, 
     eventDate: '', 
     eventTime: '', 
-    location: '',
+    specificDetails: '',
     notes: '' 
   });
   const [isUpdating, setIsUpdating] = useState(false);
@@ -197,11 +197,11 @@ export default function AdminDashboard() {
         orderNumber: editModal.order.orderNumber, 
         newDate: editModal.eventDate, 
         newTime: editModal.eventTime,
-        newDetails: editModal.location,
+        newDetails: editModal.specificDetails,
         newNotes: editModal.notes
       });
       setAlertMsg("✅ 訂單與 PDF 已成功更新！");
-      setEditModal({ isOpen: false, order: null, eventDate: '', eventTime: '', location: '', notes: '' });
+      setEditModal({ isOpen: false, order: null, eventDate: '', eventTime: '', specificDetails: '', notes: '' });
       fetchOrders();
     } catch (err) {
       setAlertMsg("❌ 更新失敗：" + err.message);
@@ -392,7 +392,7 @@ export default function AdminDashboard() {
               order: o, 
               eventDate: o.eventDate || '', 
               eventTime: o.eventTime || '', 
-              location: o.specificDetails || '',
+              specificDetails: o.specificDetails || '',
               notes: o.notes || ''
             })}
             onResendClick={(o) => setResendModal({ isOpen: true, order: o, email: o.ordererEmail || '' })}

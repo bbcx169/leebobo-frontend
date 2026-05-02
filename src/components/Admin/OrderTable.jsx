@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { parseSpecificDetails } from '../../utils/orderDetails';
 
 export default function OrderTable({ 
   searchTerm, 
@@ -157,14 +158,8 @@ export default function OrderTable({
               ) : (
                 finalDisplayOrders.map(order => {
                   const isPickup = order.deliveryCity === '自取';
-                  let cleanAddress = '';
-                  
-                  if (order.specificDetails) {
-                    const lines = String(order.specificDetails).split('\n');
-                    const addrLine = lines.find(l => l.includes('地址：'));
-                    // 擷取「地址：」或「取貨地址：」後的文字
-                    cleanAddress = addrLine ? addrLine.replace(/.*地址：/, '').trim() : lines[0].trim();
-                  }
+                  const parsedDetails = parseSpecificDetails(order.specificDetails);
+                  const cleanAddress = parsedDetails.address || String(order.specificDetails || '').split('\n')[0].trim();
                   
                   // 🚀 修改處：自取時直接使用擷取出的字串 (如：需配合商家時間地點自取)，不再隱藏覆寫
                   let addressText = isPickup 

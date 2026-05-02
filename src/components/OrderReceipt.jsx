@@ -1,6 +1,7 @@
 // src/components/OrderReceipt.jsx
 
 import React from 'react';
+import { parseSpecificDetails } from '../utils/orderDetails';
 
 const OrderReceipt = ({ order, products }) => {
   // 防呆：若無資料則不渲染
@@ -35,21 +36,7 @@ const OrderReceipt = ({ order, products }) => {
     </React.Fragment>
   );
 
-  // 💡 智慧解析地址與地點
-  let detailAddress = '';
-  let locationText = '';
-
-  if (p.specificDetails) {
-    const lines = p.specificDetails.split('\n');
-    const addrLine = lines.find(l => l.startsWith('地址：') || l.startsWith('取貨地址：'));
-    if (addrLine) {
-        detailAddress = addrLine.replace(/^(地址：|取貨地址：)/, '').trim();
-    }
-    const locLine = lines.find(l => l.startsWith('地點：'));
-    if (locLine) {
-        locationText = locLine.replace('地點：', '').trim();
-    }
-  }
+  const { address: detailAddress, locationName: locationText } = parseSpecificDetails(p.specificDetails);
 
   // 💡 雙代收人拆解邏輯
   const isWedding = p.eventType === '浪漫婚禮 / 喜宴';

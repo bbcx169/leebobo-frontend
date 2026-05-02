@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatSpecificDetails, parseSpecificDetails } from '../../utils/orderDetails';
 
 export default function AdminModals({
   // 系統提示狀態
@@ -18,29 +19,18 @@ export default function AdminModals({
   onResendPDF
 }) {
 
-  // 💡 顧問優化：解析原始 specificDetails 字串，拆分為地點名稱與地址
-  // 邏輯：從 "地點：XXX\n地址：YYY" 格式中提取內容
-  const parseLocation = (rawStr = '') => {
-    const locMatch = rawStr.match(/地點：(.*?)(?:\n|$)/);
-    const addrMatch = rawStr.match(/地址：(.*?)(?:\n|$)/);
-    
-    // 如果字串中包含標籤，則提取內容；若無標籤（舊資料），則將整段視為地點名稱
-    return {
-      locName: locMatch ? locMatch[1] : (rawStr.includes('地址：') ? '' : rawStr),
-      addrValue: addrMatch ? addrMatch[1] : ''
-    };
-  };
-
   // 🚀 修正：將屬性名稱從 location 改為 specificDetails，確保與後端對接
-  const { locName, addrValue } = parseLocation(editModal?.specificDetails);
+  const { locationName: locName, address: addrValue } = parseSpecificDetails(editModal?.specificDetails);
 
   // 💡 顧問優化：當使用者修改拆分欄位時，自動合併為 GAS 標籤格式
   const handleLocationPartChange = (type, value) => {
     let newLocName = type === 'locName' ? value : locName;
     let newAddrValue = type === 'addrValue' ? value : addrValue;
     
-    // 合併為標準格式：地點：[內容]\n地址：[內容]
-    const formattedDetails = `地點：${newLocName}\n地址：${newAddrValue}`;
+    const formattedDetails = formatSpecificDetails({
+      locationName: newLocName,
+      address: newAddrValue
+    });
     
     setEditModal({
       ...editModal,

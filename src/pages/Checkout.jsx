@@ -10,6 +10,7 @@ import Step1Event from '../components/checkout/Step1Event';
 import Step2Location from '../components/checkout/Step2Location';
 import Step3Contact from '../components/checkout/Step3Contact';
 import Step4Confirm from '../components/checkout/Step4Confirm';
+import { formatSpecificDetails } from '../utils/orderDetails';
 
 const Checkout = ({ 
   cart, 
@@ -177,7 +178,11 @@ const Checkout = ({
     const fullAddress = isLocked ? '需配合商家時間地點自取' : `${currentCityName}${detailAddress}`;
     const locationText = formData.eventType === 'wedding' ? formData.weddingLocation : formData.generalLocation;
     const finalEventTime = isLocked ? '需配合商家時間地點自取' : (formData.weddingTime || formData.generalTime || '未提供');
-    const specificDetails = isLocked ? `取貨地址：${fullAddress}` : `地點：${locationText || '未提供'}\n地址：${fullAddress}`;
+    const specificDetails = formatSpecificDetails({
+      isPickup: isLocked,
+      locationName: locationText,
+      address: fullAddress
+    });
 
     const payload = { 
         orderDate: new Date().toLocaleDateString('zh-TW'),
