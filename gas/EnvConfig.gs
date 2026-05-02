@@ -14,10 +14,7 @@ const LINE_CHANNEL_ACCESS_TOKEN = 'Szz8gLG1ZeHuVW9DoTRtFf86tmxkfl4k0uGmD1xttmvdZ
 const LINE_ADMIN_USER_ID = 'U4460cd7d1f421c42d6dbf0f07253580e';
 
 // 🔐 權限與安全
-const ADMIN_LINE_IDS = [
-  'U4460cd7d1f421c42d6dbf0f07253580e', 
-  '2009807397-WPVPBokl'
-];
+const ADMIN_LINE_IDS = 'U4460cd7d1f421c42d6dbf0f07253580e';
 const ADMIN_PASSWORD = 'leebobo_admin';
 
 // 📊 試算表與雲端硬碟設定
