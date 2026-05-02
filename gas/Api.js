@@ -314,11 +314,17 @@ function doGet(e) {
 function sendLineOfficialMessage(text) {
   const messageText = text ? String(text).trim() : "⚠️ 系統測試正常。"; 
   if (!messageText) return;
+  const lineAccessToken = getNotificationConfigValue("LINE_CHANNEL_ACCESS_TOKEN", typeof LINE_CHANNEL_ACCESS_TOKEN !== "undefined" ? LINE_CHANNEL_ACCESS_TOKEN : "");
+  const lineAdminUserId = getNotificationConfigValue("LINE_ADMIN_USER_ID", typeof LINE_ADMIN_USER_ID !== "undefined" ? LINE_ADMIN_USER_ID : "");
+  if (!lineAccessToken || !lineAdminUserId) {
+    Logger.log("LINE notification skipped: LINE_CHANNEL_ACCESS_TOKEN or LINE_ADMIN_USER_ID is not configured in Script Properties.");
+    return;
+  }
   const url = 'https://api.line.me/v2/bot/message/push';
-  const payload = { to: LINE_ADMIN_USER_ID, messages: [{ type: 'text', text: messageText }] };
+  const payload = { to: lineAdminUserId, messages: [{ type: 'text', text: messageText }] };
   const options = { 
     method: 'post', 
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN }, 
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + lineAccessToken }, 
     payload: JSON.stringify(payload), 
     muteHttpExceptions: true 
   };
@@ -339,10 +345,7 @@ function sendMerchantNotification(text) {
   const messageText = text ? String(text).trim() : "";
   if (!messageText) return;
 
-  if (LINE_CHANNEL_ACCESS_TOKEN && LINE_ADMIN_USER_ID) {
-    sendLineOfficialMessage(messageText);
-  }
-
+  sendLineOfficialMessage(messageText);
   sendTelegramMessage(messageText);
 }
 
@@ -362,30 +365,49 @@ function sendTelegramMessage(text) {
   const chatId = getNotificationConfigValue("TELEGRAM_CHAT_ID", typeof TELEGRAM_CHAT_ID !== "undefined" ? TELEGRAM_CHAT_ID : "");
   const messageText = text ? String(text).trim() : "";
 
-  if (!botToken || !chatId || !messageText) return;
+  if (!messageText) return;
+
+  if (!botToken || !chatId) {
+    Logger.log("Telegram notification skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not configured in Script Properties.");
+    return;
+  }
 
   const url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
-  const payload = {
-    chat_id: chatId,
-    text: messageText,
-    disable_web_page_preview: true
-  };
-  const options = {
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
 
-  try {
-    const response = UrlFetchApp.fetch(url, options);
-    const responseCode = response.getResponseCode();
-    if (responseCode < 200 || responseCode >= 300) {
-      Logger.log("Telegram API error, code: " + responseCode + ", body: " + response.getContentText());
+  getTelegramChatIds(chatId).forEach(function(targetChatId) {
+    const payload = {
+      chat_id: targetChatId,
+      text: messageText,
+      disable_web_page_preview: true
+    };
+    const options = {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    try {
+      const response = UrlFetchApp.fetch(url, options);
+      const responseCode = response.getResponseCode();
+      if (responseCode < 200 || responseCode >= 300) {
+        Logger.log("Telegram API error for chat " + targetChatId + ", code: " + responseCode + ", body: " + response.getContentText());
+      }
+    } catch (e) {
+      Logger.log("Telegram connection error for chat " + targetChatId + ": " + e.toString());
     }
-  } catch (e) {
-    Logger.log("Telegram connection error: " + e.toString());
-  }
+  });
+}
+
+function getTelegramChatIds(chatIdSetting) {
+  return String(chatIdSetting)
+    .split(/[,\n]/)
+    .map(function(chatId) { return chatId.trim(); })
+    .filter(function(chatId) { return chatId; });
+}
+
+function testTelegramNotification() {
+  sendTelegramMessage("Telegram notification test from GAS.");
 }
 
 function kickstartReminder() { 
