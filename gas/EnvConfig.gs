@@ -13,6 +13,24 @@ const NOTIFY_EMAIL = 'bbcx169@gmail.com';
 const LINE_CHANNEL_ACCESS_TOKEN = 'Szz8gLG1ZeHuVW9DoTRtFf86tmxkfl4k0uGmD1xttmvdZIvQ800W/UDGJ23GeYjdHA/pCFm2oabZC/u3JQ+crvIMwwNHStr8ulYPPBtHwoKul2vFm97nUWvBkdmCqM1v8vxdCIcRbUGlBWkawcj9ZwdB04t89/1O/w1cDnyilFU=';
 const LINE_ADMIN_USER_ID = 'U4460cd7d1f421c42d6dbf0f07253580e';
 
+// Telegram Bot API settings. Prefer setting these in Apps Script Properties:
+// TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.
+const TELEGRAM_BOT_TOKEN = '';
+const TELEGRAM_CHAT_ID = '';
+
+function setTelegramNotificationProperties(botToken, chatId) {
+  if (!botToken || !chatId) {
+    throw new Error('Telegram bot token and chat id are required.');
+  }
+
+  PropertiesService.getScriptProperties().setProperties({
+    TELEGRAM_BOT_TOKEN: String(botToken),
+    TELEGRAM_CHAT_ID: String(chatId)
+  });
+
+  return 'Telegram notification properties updated.';
+}
+
 // 🔐 權限與安全
 const ADMIN_LINE_IDS = 'U4460cd7d1f421c42d6dbf0f07253580e';
 const ADMIN_PASSWORD = 'leebobo_admin';

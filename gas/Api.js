@@ -233,7 +233,7 @@ function doPost(e) {
       
       // 發送通知
       const messageContent = `🍡【新訂單通知】\n編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日：${data.eventDate} ${data.eventTime}\n[PDF連結]：\n${directUrl}`;
-      if (LINE_CHANNEL_ACCESS_TOKEN && LINE_ADMIN_USER_ID) sendLineOfficialMessage(messageContent);
+      sendMerchantNotification(messageContent);
       
       if (NOTIFY_EMAIL) {
         MailApp.sendEmail({
@@ -335,6 +335,59 @@ function sendLineOfficialMessage(text) {
   }
 }
 
+function sendMerchantNotification(text) {
+  const messageText = text ? String(text).trim() : "";
+  if (!messageText) return;
+
+  if (LINE_CHANNEL_ACCESS_TOKEN && LINE_ADMIN_USER_ID) {
+    sendLineOfficialMessage(messageText);
+  }
+
+  sendTelegramMessage(messageText);
+}
+
+function getNotificationConfigValue(keyName, fallbackValue) {
+  if (fallbackValue) return fallbackValue;
+
+  try {
+    return PropertiesService.getScriptProperties().getProperty(keyName) || "";
+  } catch (e) {
+    Logger.log("Unable to read notification setting " + keyName + ": " + e.toString());
+    return "";
+  }
+}
+
+function sendTelegramMessage(text) {
+  const botToken = getNotificationConfigValue("TELEGRAM_BOT_TOKEN", typeof TELEGRAM_BOT_TOKEN !== "undefined" ? TELEGRAM_BOT_TOKEN : "");
+  const chatId = getNotificationConfigValue("TELEGRAM_CHAT_ID", typeof TELEGRAM_CHAT_ID !== "undefined" ? TELEGRAM_CHAT_ID : "");
+  const messageText = text ? String(text).trim() : "";
+
+  if (!botToken || !chatId || !messageText) return;
+
+  const url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
+  const payload = {
+    chat_id: chatId,
+    text: messageText,
+    disable_web_page_preview: true
+  };
+  const options = {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    if (responseCode < 200 || responseCode >= 300) {
+      Logger.log("Telegram API error, code: " + responseCode + ", body: " + response.getContentText());
+    }
+  } catch (e) {
+    Logger.log("Telegram connection error: " + e.toString());
+  }
+}
+
 function kickstartReminder() { 
   manageReminderTrigger(true, '11:00'); 
   Logger.log("✅ 每日提醒觸發器已手動啟動！"); 
@@ -420,10 +473,10 @@ function sendDailyReminder() {
          if (o.notes) message += `備註：${o.notes}\n`;
       });
     }
-    sendLineOfficialMessage(message);
+    sendMerchantNotification(message);
   } catch(e) { 
     Logger.log(e); 
-    sendLineOfficialMessage("⚠️ 每日提醒功能發生錯誤：" + e.toString()); 
+    sendMerchantNotification("⚠️ 每日提醒功能發生錯誤：" + e.toString()); 
   } finally {
     const props = PropertiesService.getScriptProperties(); 
     const enabled = props.getProperty('reminderEnabled') !== 'false'; 
