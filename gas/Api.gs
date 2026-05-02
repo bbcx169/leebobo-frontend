@@ -233,7 +233,7 @@ function doPost(e) {
       
       // 發送通知
       const messageContent = `🍡【新訂單通知】\n編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日：${data.eventDate} ${data.eventTime}\n[PDF連結]：\n${directUrl}`;
-      if (LINE_CHANNEL_ACCESS_TOKEN && LINE_ADMIN_USER_ID) sendLineOfficialMessage(messageContent);
+      sendMerchantNotification(messageContent);
       
       if (NOTIFY_EMAIL) {
         MailApp.sendEmail({
@@ -314,11 +314,17 @@ function doGet(e) {
 function sendLineOfficialMessage(text) {
   const messageText = text ? String(text).trim() : "⚠️ 系統測試正常。"; 
   if (!messageText) return;
+  const lineAccessToken = getNotificationConfigValue("LINE_CHANNEL_ACCESS_TOKEN", typeof LINE_CHANNEL_ACCESS_TOKEN !== "undefined" ? LINE_CHANNEL_ACCESS_TOKEN : "");
+  const lineAdminUserId = getNotificationConfigValue("LINE_ADMIN_USER_ID", typeof LINE_ADMIN_USER_ID !== "undefined" ? LINE_ADMIN_USER_ID : "");
+  if (!lineAccessToken || !lineAdminUserId) {
+    Logger.log("LINE notification skipped: LINE_CHANNEL_ACCESS_TOKEN or LINE_ADMIN_USER_ID is not configured in Script Properties.");
+    return;
+  }
   const url = 'https://api.line.me/v2/bot/message/push';
-  const payload = { to: LINE_ADMIN_USER_ID, messages: [{ type: 'text', text: messageText }] };
+  const payload = { to: lineAdminUserId, messages: [{ type: 'text', text: messageText }] };
   const options = { 
     method: 'post', 
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN }, 
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + lineAccessToken }, 
     payload: JSON.stringify(payload), 
     muteHttpExceptions: true 
   };
@@ -333,6 +339,75 @@ function sendLineOfficialMessage(text) {
   } catch (e) { 
     Logger.log("🚨 LINE 連線異常：" + e.toString()); 
   }
+}
+
+function sendMerchantNotification(text) {
+  const messageText = text ? String(text).trim() : "";
+  if (!messageText) return;
+
+  sendLineOfficialMessage(messageText);
+  sendTelegramMessage(messageText);
+}
+
+function getNotificationConfigValue(keyName, fallbackValue) {
+  if (fallbackValue) return fallbackValue;
+
+  try {
+    return PropertiesService.getScriptProperties().getProperty(keyName) || "";
+  } catch (e) {
+    Logger.log("Unable to read notification setting " + keyName + ": " + e.toString());
+    return "";
+  }
+}
+
+function sendTelegramMessage(text) {
+  const botToken = getNotificationConfigValue("TELEGRAM_BOT_TOKEN", typeof TELEGRAM_BOT_TOKEN !== "undefined" ? TELEGRAM_BOT_TOKEN : "");
+  const chatId = getNotificationConfigValue("TELEGRAM_CHAT_ID", typeof TELEGRAM_CHAT_ID !== "undefined" ? TELEGRAM_CHAT_ID : "");
+  const messageText = text ? String(text).trim() : "";
+
+  if (!messageText) return;
+
+  if (!botToken || !chatId) {
+    Logger.log("Telegram notification skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not configured in Script Properties.");
+    return;
+  }
+
+  const url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
+
+  getTelegramChatIds(chatId).forEach(function(targetChatId) {
+    const payload = {
+      chat_id: targetChatId,
+      text: messageText,
+      disable_web_page_preview: true
+    };
+    const options = {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    try {
+      const response = UrlFetchApp.fetch(url, options);
+      const responseCode = response.getResponseCode();
+      if (responseCode < 200 || responseCode >= 300) {
+        Logger.log("Telegram API error for chat " + targetChatId + ", code: " + responseCode + ", body: " + response.getContentText());
+      }
+    } catch (e) {
+      Logger.log("Telegram connection error for chat " + targetChatId + ": " + e.toString());
+    }
+  });
+}
+
+function getTelegramChatIds(chatIdSetting) {
+  return String(chatIdSetting)
+    .split(/[,\n]/)
+    .map(function(chatId) { return chatId.trim(); })
+    .filter(function(chatId) { return chatId; });
+}
+
+function testTelegramNotification() {
+  sendTelegramMessage("Telegram notification test from GAS.");
 }
 
 function kickstartReminder() { 
@@ -420,10 +495,10 @@ function sendDailyReminder() {
          if (o.notes) message += `備註：${o.notes}\n`;
       });
     }
-    sendLineOfficialMessage(message);
+    sendMerchantNotification(message);
   } catch(e) { 
     Logger.log(e); 
-    sendLineOfficialMessage("⚠️ 每日提醒功能發生錯誤：" + e.toString()); 
+    sendMerchantNotification("⚠️ 每日提醒功能發生錯誤：" + e.toString()); 
   } finally {
     const props = PropertiesService.getScriptProperties(); 
     const enabled = props.getProperty('reminderEnabled') !== 'false'; 
