@@ -49,7 +49,7 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
     setEmailErrMsg('');
 
     try {
-      const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzf8kJ6Ka8yGabg--MCRJ8eyucBbsGRDbceGEeH-CQDLqOMXhTCysZVrPKL0MLpSg4L/exec';
+      const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL;
       
       const response = await fetch(SCRIPT_URL, {
         method: 'POST',

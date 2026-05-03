@@ -5,12 +5,13 @@ import liff from '@line/liff';
 import DashboardStats from '../components/Admin/DashboardStats';
 import OrderTable from '../components/Admin/OrderTable';
 import AdminModals from '../components/Admin/AdminModals';
-import RevenueReport from '../components/Admin/RevenueReport'; // 👈 確保此組件已建立
+import RevenueReport from '../components/Admin/RevenueReport';
 
 // ==========================================
 // 全域常數設定
 // ==========================================
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzf8kJ6Ka8yGabg--MCRJ8eyucBbsGRDbceGEeH-CQDLqOMXhTCysZVrPKL0MLpSg4L/exec';
+// 🚀 核心修改：僅讀取環境變數，移除備用寫死網址
+const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL;
 const LIFF_ID = '2009807397-WPVPBokl';
 
 const productMapping = {
@@ -26,9 +27,7 @@ export default function AdminDashboard() {
   const [userProfile, setUserProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, orders, revenue, settings
   
-  // 導覽列伸縮狀態 (預設關閉)
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-  
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -53,7 +52,6 @@ export default function AdminDashboard() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // 🚀 新增：密碼備用登入狀態
   const [passwordInput, setPasswordInput] = useState('');
   const [isVerifyingPwd, setIsVerifyingPwd] = useState(false);
 
@@ -126,7 +124,6 @@ export default function AdminDashboard() {
   const handleLogin = () => liff.login({ redirectUri: window.location.href });
   const handleLogout = () => { liff.logout(); window.location.reload(); };
 
-  // 🚀 新增：備用密碼登入邏輯
   const handlePasswordLogin = async () => {
     if (!passwordInput) {
       setAlertMsg("請輸入管理員通關密碼");
@@ -134,9 +131,7 @@ export default function AdminDashboard() {
     }
     setIsVerifyingPwd(true);
     try {
-      // 呼叫我們即將在 GAS 中新增的 verify_password API
       const result = await callGasApi({ action: 'verify_password', password: passwordInput });
-      
       if (result.status === 'success') {
         setUserProfile({ displayName: '管理員 (密碼登入)', pictureUrl: null });
         setAuthStatus('logged_in');
@@ -153,10 +148,10 @@ export default function AdminDashboard() {
   };
 
   // ==========================================
-  // 3. 資料處理邏輯 (解決 DashboardStats 的 Crash 問題)
+  // 3. 資料處理邏輯
   // ==========================================
   const { dailyOrders, dailyMaterials } = useMemo(() => {
-    const dOrders = orders
+    const dOrders = (orders || [])
       .filter(o => o.eventDate === selectedDate)
       .sort((a, b) => (a.eventTime || '').localeCompare(b.eventTime || ''));
       
@@ -241,10 +236,8 @@ export default function AdminDashboard() {
   // ==========================================
   if (authStatus === 'checking') return <div className="h-screen flex items-center justify-center bg-gray-50 text-2xl font-bold">驗證中...</div>;
   
-  // 🚀 更新：加入密碼備用登入介面的 unauth 狀態
   if (authStatus === 'unauth') return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6 relative">
-      {/* 若有系統訊息則疊加顯示 */}
       {alertMsg && (
         <div className="absolute top-10 w-full max-w-sm z-50">
           <div className="bg-red-50 text-red-600 font-bold px-6 py-4 rounded-2xl shadow-lg border border-red-200 text-center mx-auto relative">
@@ -256,20 +249,14 @@ export default function AdminDashboard() {
 
       <div className="bg-white p-10 md:p-12 rounded-3xl shadow-xl text-center max-w-md w-full">
         <h1 className="text-3xl font-bold text-amberRed mb-8 tracking-widest">李伯伯管理後台</h1>
-        
-        {/* LINE 登入按鈕 */}
         <button onClick={handleLogin} className="w-full bg-[#06C755] text-white px-10 py-5 rounded-2xl font-bold text-xl shadow-lg hover:scale-105 transition-transform mb-6">
           LINE 快捷登入
         </button>
-        
-        {/* 分隔線 */}
         <div className="flex items-center gap-3 my-8">
           <div className="h-px bg-gray-200 flex-1"></div>
           <span className="text-gray-400 text-sm font-bold">或使用備用通道</span>
           <div className="h-px bg-gray-200 flex-1"></div>
         </div>
-
-        {/* 密碼登入區塊 */}
         <div className="space-y-4">
           <input 
             type="password" 
@@ -295,8 +282,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100 text-darkWood">
-      
-      {/* 側邊導覽列 */}
       <aside className={`fixed md:static inset-y-0 left-0 bg-white shadow-xl z-50 flex flex-col transition-all duration-300 ease-in-out ${isSidebarExpanded ? 'w-64' : 'w-20'} ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-4 border-b border-gray-100 flex items-center justify-between overflow-hidden">
            {isSidebarExpanded ? <h1 className="text-2xl font-bold text-amberRed tracking-widest whitespace-nowrap">李伯伯</h1> : <span className="text-2xl font-bold text-amberRed mx-auto">李</span>}
@@ -304,7 +289,6 @@ export default function AdminDashboard() {
              <svg className={`w-5 h-5 text-gray-400 transition-transform ${isSidebarExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 5l7 7-7 7M5 5l7 7-7 7" strokeWidth="2"/></svg>
            </button>
         </div>
-        
         <div className={`px-4 py-6 bg-gray-50 border-b border-gray-100 flex items-center transition-all ${isSidebarExpanded ? 'gap-4' : 'justify-center'}`}>
           {userProfile?.pictureUrl ? (
             <img src={userProfile.pictureUrl} className="w-10 h-10 rounded-full border-2 border-white shadow-sm flex-shrink-0" alt="avatar" />
@@ -318,7 +302,6 @@ export default function AdminDashboard() {
             </div>
           )}
         </div>
-
         <nav className="flex-1 p-3 space-y-2 overflow-x-hidden">
           {[
             { id: 'dashboard', icon: '📊', label: '排程與備料' },
@@ -337,10 +320,7 @@ export default function AdminDashboard() {
             </button>
           ))}
         </nav>
-        
-        {/* 🚀 更新：返回前台與登出區塊 */}
         <div className="p-3 border-t border-gray-100 space-y-2">
-          {/* 返回前台按鈕 */}
           <button 
             onClick={() => window.location.href = '/'} 
             className={`w-full py-3 flex items-center justify-center text-lg text-gray-600 font-bold hover:bg-gray-50 rounded-2xl transition-colors border border-transparent hover:border-gray-100 ${isSidebarExpanded ? 'px-4' : 'px-0'}`}
@@ -349,8 +329,6 @@ export default function AdminDashboard() {
             <span>🏠</span>
             {isSidebarExpanded && <span className="ml-2">返回前台</span>}
           </button>
-          
-          {/* 登出按鈕 */}
           <button 
             onClick={handleLogout} 
             className={`w-full py-3 flex items-center justify-center text-lg text-red-500 font-bold hover:bg-red-50 rounded-2xl transition-colors border border-red-50 ${isSidebarExpanded ? 'px-4' : 'px-0'}`}
@@ -362,26 +340,15 @@ export default function AdminDashboard() {
         </div>
       </aside>
 
-      {/* 主內容區 */}
       <main className="flex-1 overflow-y-auto p-6 md:p-10 relative scrollbar-hide">
         {isLoading && (
           <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-20 flex items-center justify-center">
             <div className="bg-white px-8 py-4 rounded-full shadow-2xl text-amberRed font-bold text-xl animate-pulse">更新資料中...</div>
           </div>
         )}
-
-        {/* 1. 排程與備料看板 */}
         {activeTab === 'dashboard' && (
-          <DashboardStats 
-            orders={orders} 
-            selectedDate={selectedDate} 
-            setSelectedDate={setSelectedDate} 
-            dailyOrders={dailyOrders} 
-            dailyMaterials={dailyMaterials} 
-          />
+          <DashboardStats orders={orders} selectedDate={selectedDate} setSelectedDate={setSelectedDate} dailyOrders={dailyOrders} dailyMaterials={dailyMaterials} />
         )}
-
-        {/* 2. 訂單總覽表格 */}
         {activeTab === 'orders' && (
           <OrderTable 
             searchTerm={searchTerm} 
@@ -398,15 +365,11 @@ export default function AdminDashboard() {
             onResendClick={(o) => setResendModal({ isOpen: true, order: o, email: o.ordererEmail || '' })}
           />
         )}
-
-        {/* 3. 營收報表渲染區塊 */}
         {activeTab === 'revenue' && (
           <div className="max-w-7xl mx-auto">
              <RevenueReport scriptUrl={SCRIPT_URL} />
           </div>
         )}
-
-        {/* 4. 系統設定 */}
         {activeTab === 'settings' && (
           <div className="max-w-3xl mx-auto space-y-8 animate-[fadeIn_0.3s_ease-out]">
             <header>
@@ -434,16 +397,12 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-
-        {/* 彈窗組件大集合 */}
         <AdminModals 
           alertMsg={alertMsg} setAlertMsg={setAlertMsg}
           editModal={editModal} setEditModal={setEditModal} isUpdating={isUpdating} onUpdateOrderTime={handleUpdateOrderTime}
           resendModal={resendModal} setResendModal={setResendModal} isResending={isResending} onResendPDF={handleResendPDF}
         />
       </main>
-
-      {/* 手機版選單按鈕 */}
       <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden fixed top-6 right-6 z-40 bg-white p-4 rounded-full shadow-2xl border border-gray-200 text-amberRed">
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" strokeWidth="2.5" strokeLinecap="round"/></svg>
       </button>
