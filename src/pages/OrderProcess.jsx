@@ -31,6 +31,7 @@ const OrderProcess = ({ navigateTo }) => {
                 { q: "單日訂購數量有上限嗎？", a: "有的。為了堅持每一支糖葫蘆都是當日純手工新鮮熬製，確保糖衣薄脆不黏牙的最高品質，我們每日的產能上限為 800 支。若您預定日期的額度已滿，系統會溫馨提醒您微調數量或更改日期。感謝您的體諒與支持，讓我們為您呈現最完美的甜蜜！🍡" },
                 { q: "我需要提前多久訂購？", a: "所有產品皆為接單後新鮮製作。請務必於活動日前 14 天完成預訂，以利職人備料。" }, 
                 { q: "送出訂單後如何確認是否成功？", a: "送出後系統會生成 PDF 明細，請務必點擊連結加入「LINE 官方帳號」告知訂單編號，待專人核對細節後訂單才正式成立。" }, 
+                { q: "如何支付貨款？", a: "目前採「預付訂金、交付尾款」之方式辦理：訂金支付：請依商家提供之帳號，進行 銀行轉帳 / ATM 匯款 支付訂金，以完成訂購程序。並請於 LINE 官方帳號回傳「帳號後五碼」以利對帳。餘款支付：最後於交付商品時，以現金支付剩餘款項即可。" },
                 { q: "可以更改訂購數量或口味嗎？", a: "若需調整請於活動日 7 天前透過 LINE 或 電話 聯繫。因 14 天內已進入備料階段，我們將盡力協助但不保證能修改。" }
             ] 
         },
@@ -81,7 +82,7 @@ const OrderProcess = ({ navigateTo }) => {
             {/* 溫馨提醒區塊 */}
             <div className="mb-16 transform transition-all hover:scale-[1.01] fade-in-up">
                 <div className="bg-gradient-to-r from-[#A52A2A]/10 to-[#A52A2A]/5 border border-[#A52A2A]/30 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 shadow-sm backdrop-blur-md">
-                    <div className="w-14 h-14 md:w-16 md:h-16 shrink-0 bg-white border-2 border-[#A52A2A]/20 rounded-full flex items-center justify-center text-amberRed shadow-sm relative overflow-hidden">
+                    <div className="w-14 h-14 md:w-16 h-16 shrink-0 bg-white border-2 border-[#A52A2A]/20 rounded-full flex items-center justify-center text-amberRed shadow-sm relative overflow-hidden">
                         <svg className="w-7 h-7 md:w-8 md:h-8 relative z-10 animate-bounce text-amberRed" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path><path d="M12 2v2"></path><path d="M4 8h2"></path><path d="M18 8h2"></path><path d="M6 4l1 1"></path><path d="M18 4l-1 1"></path>
                         </svg>

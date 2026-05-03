@@ -37,7 +37,7 @@ const BrandStory = ({ navigateTo }) => {
                     <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-creamBg to-transparent z-10 md:hidden"></div>
                     
                     {/* 👇 2. 將 src 替換為 heroImg 變數 */}
-                    <img src={heroImg} alt="職人熬糖意象" className="w-full h-full object-cover object-center" style={{filter: 'brightness(1.05) contrast(1.05) saturate(1.1)'}} fetchpriority="high" />
+                    <img src={heroImg} alt="職人熬糖意象" className="w-full h-full object-cover object-center" style={{filter: 'brightness(1.05) contrast(1.05) saturate(1.1)'}} fetchPriority="high" />
                     
                     <div className="absolute bottom-8 right-8 glass-panel-light p-4 rounded-xl hidden md:block">
                         <p className="text-darkWood font-serif text-sm tracking-widest">純砂糖 / 慢火熬</p>
