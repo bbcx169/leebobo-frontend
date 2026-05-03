@@ -181,6 +181,29 @@ const OrderReceipt = ({ order, products }) => {
           </div>
         </div>
       </div>
+
+      {/* 💡 區塊 4：訂購需知 (新增) */}
+      <div className="space-y-3 pt-2">
+        <h3 className="text-base font-bold text-amberRed border-b border-warmWood/20 pb-2 flex items-center gap-2">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          訂購需知
+        </h3>
+        <div className="bg-creamBg/50 p-4 rounded-xl border border-warmWood/20 text-darkWood/80 leading-relaxed text-sm">
+          親愛的顧客您好：為了確保您的訂單能順利處理，建議您在下單前詳讀官網中的{' '}
+          <a 
+            href="https://bbcx169.github.io/leebobo-frontend/process" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-amberRed underline font-bold hover:text-amberRed/80 transition-colors"
+          >
+            訂購流程與常見問題 (FAQ)
+          </a>
+          。裡面整理了關於配送、訂單修改及常見疑問的說明，希望能幫助您擁有更流暢的訂購體驗，謝謝您的支持！
+        </div>
+      </div>
+
     </div>
   );
 };
