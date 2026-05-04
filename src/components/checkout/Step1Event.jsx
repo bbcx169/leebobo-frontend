@@ -1,6 +1,62 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { db } from '../../utils/firebase'; 
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
-const Step1Event = ({ formData, handleFormChange, getMinDate }) => {
+const Step1Event = ({ formData, handleFormChange, getMinDate, currentTotalQty = 0 }) => {
+  const [isChecking, setIsChecking] = useState(false);
+
+  const handleDateValidation = async (e) => {
+    // ⚠️ 必須在進入非同步 (await) 之前，先把這些值「拷貝」保存下來
+    const selectedDate = e.target.value;
+    const inputName = e.target.name; 
+
+    // 1. ✨【關鍵修正】：先立刻更新父元件的狀態，讓畫面上的日期馬上改變！
+    // 這裡我們手動建構一個假的 event 物件傳過去，避免原本的 e 物件失效
+    handleFormChange({ target: { name: inputName, value: selectedDate } });
+
+    // 如果使用者是手動清空日期，直接結束，不用查資料庫
+    if (!selectedDate) {
+      return;
+    }
+
+    // 開始背景檢查額度
+    setIsChecking(true);
+    try {
+      let totalCandiesUsed = 0;
+      
+      const ordersRef = collection(db, "orders");
+      const q = query(ordersRef, where("eventDate", "==", selectedDate));
+      const querySnapshot = await getDocs(q);
+
+      querySnapshot.forEach((doc) => {
+        const orderData = doc.data();
+        if (orderData.candyTotal) {
+          totalCandiesUsed += parseInt(orderData.candyTotal, 10);
+        }
+      });
+
+      const remaining = Math.max(0, 800 - totalCandiesUsed);
+
+      // 判斷額度是否足夠
+      if (remaining < currentTotalQty) {
+        alert(`非常抱歉，為堅持手工新鮮製作的品質，我們每日產能上限為 800 支。\n\n您選擇的日期目前剩餘可訂購額度為 ${remaining} 支。\n\n請微調數量或選擇其他日期，感謝您的體諒！🍡`);
+        
+        // 2. ✨【關鍵修正】：額度不足，強迫把剛剛寫入的日期清空
+        handleFormChange({ target: { name: inputName, value: '' } });
+      } else {
+        console.log(`日期驗證成功！該日剩餘額度：${remaining} 支`); 
+      }
+    } catch (error) {
+      console.error('日期驗證失敗:', error);
+      alert('系統暫時無法核對產能額度，請稍後再試。');
+      
+      // 發生錯誤為求安全，也清空日期
+      handleFormChange({ target: { name: inputName, value: '' } });
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
       <h2 className="text-2xl font-bold text-darkWood mb-6 font-serif flex items-center gap-2">
@@ -24,15 +80,20 @@ const Step1Event = ({ formData, handleFormChange, getMinDate }) => {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-darkWood mb-2">預計日期 * (需14天後)</label>
+        <label className="block text-sm font-medium text-darkWood mb-2 flex items-center">
+          預計日期 * (需14天後)
+          {isChecking && <span className="text-amberRed text-xs ml-3 animate-pulse">⏳ 核對額度中...</span>}
+        </label>
         <input 
           type="date" 
           name={formData.eventType === 'wedding' ? 'weddingDate' : 'generalDate'} 
           required 
           min={getMinDate()} 
-          value={formData.weddingDate || formData.generalDate} 
-          onChange={handleFormChange} 
-          className="w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite outline-none" 
+          // 修正綁定邏輯，精準對應 eventType 顯示的日期
+          value={formData.eventType === 'wedding' ? (formData.weddingDate || '') : (formData.generalDate || '')} 
+          onChange={handleDateValidation} 
+          disabled={isChecking}
+          className={`w-full px-4 py-3 rounded-xl border border-warmWood/30 bg-pureWhite outline-none transition-opacity ${isChecking ? 'opacity-50 cursor-not-allowed' : ''}`} 
         />
       </div>
     </div>

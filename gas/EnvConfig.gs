@@ -1,9 +1,11 @@
+// EnvConfig.gs
+
 /**
  * ==========================================
  * 李伯伯糖葫蘆 - 環境設定與全域參數 (EnvConfig.gs)
  * ==========================================
- * 此檔案專門存放系統所需的 API Token、ID、價格對照表與開關。
- * 修改此處設定即可改變系統行為，不需動到核心邏輯。
+ * 此檔案存放微服務所需的 API Token、ID、價格對照表。
+ * (註：資料庫已遷移至 Firebase，此處不再管理 Sheets 或產能上限)
  */
 
 // 📧 通知設定
@@ -13,9 +15,7 @@ const NOTIFY_EMAIL = 'bbcx169@gmail.com';
 const LINE_CHANNEL_ACCESS_TOKEN = '';
 const LINE_ADMIN_USER_ID = '';
 
-// Telegram Bot API settings. Prefer setting these in Apps Script Properties:
-// TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID. TELEGRAM_CHAT_ID can contain
-// multiple chat ids separated by commas or new lines.
+// Telegram Bot API settings
 const TELEGRAM_BOT_TOKEN = '';
 const TELEGRAM_CHAT_ID = '';
 
@@ -32,16 +32,12 @@ function setTelegramNotificationProperties(botToken, chatId) {
   return 'Telegram notification properties updated.';
 }
 
-// 🔐 權限與安全
+// 🔐 權限與安全 (備用密碼)
 const ADMIN_LINE_IDS = 'U4460cd7d1f421c42d6dbf0f07253580e';
 const ADMIN_PASSWORD = 'leebobo_admin';
 
-// 📊 試算表與雲端硬碟設定
-const SHEET_TAB_NAME = '工作表1';
+// 📁 雲端硬碟 PDF 資料夾設定
 const PDF_FOLDER_ID = '1GrWJtbw51RTZ-a0fGkrCqbiLpLgOqxH7';
-
-// 🚀 業務邏輯限制
-const DAILY_LIMIT = 800; // 每日產能上限
 
 // 🛍️ 產品價格對照表 (用於計算總金額與 PDF 顯示)
 const PRODUCTS = {

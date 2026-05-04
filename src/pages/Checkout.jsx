@@ -5,6 +5,10 @@ import { products, getMinDate, initialFormData } from '../constants/data';
 import useScrollFadeIn from '../hooks/useScrollFadeIn';
 import CartSummary from '../components/CartSummary';
 
+// ✨ 新增：導入 Firebase 相關方法
+import { db } from '../utils/firebase';
+import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
+
 // 💡 導入步驟子組件
 import Step1Event from '../components/checkout/Step1Event';
 import Step2Location from '../components/checkout/Step2Location';
@@ -35,13 +39,13 @@ const Checkout = ({
   const [submitMsg, setSubmitMsg] = useState("系統正在處理您的訂單，請稍候...");
 
   // ==========================================
-  // ⏳ 智慧載入提示輪播邏輯[cite: 8]
+  // ⏳ 智慧載入提示輪播邏輯
   // ==========================================
   useEffect(() => {
     let interval;
     if (isSubmitting) {
       const messages = [
-        "正在將訂單安全地寫入系統中...",
+        "正在將訂單安全地寫入資料庫中...",
         "正在為您生成專屬 PDF 訂單明細...",
         "就快完成了！請務必留在網頁上...",
         "正在準備發送確認通知...",
@@ -60,7 +64,7 @@ const Checkout = ({
     return () => clearInterval(interval);
   }, [isSubmitting]);
 
-  // 💡 特殊狀態連動邏輯[cite: 8]
+  // 💡 特殊狀態連動邏輯
   useEffect(() => {
     if (isSameAsOrderer && formData.eventType !== 'wedding') {
       setFormData(prev => ({ ...prev, recipientName: prev.ordererName, recipientPhone: prev.ordererPhone }));
@@ -77,7 +81,7 @@ const Checkout = ({
   }, [formData.deliveryCity, formData.eventType]);
 
   // ==========================================
-  // 🧮 金額與物流計算[cite: 8]
+  // 🧮 金額與物流計算
   // ==========================================
   const broomQty = cart[5] || 0; 
   const candyQty = Object.entries(cart).reduce((sum, [id, qty]) => parseInt(id) !== 5 ? sum + qty : sum, 0);
@@ -109,7 +113,7 @@ const Checkout = ({
   const currentCityName = cityMap[formData.deliveryCity] || '請選擇縣市';
 
   // ==========================================
-  // 🎮 行為控制與 API 串接[cite: 8]
+  // 🎮 行為控制與 API 串接
   // ==========================================
   const handleFormChange = (e) => {
     let { name, value } = e.target;
@@ -127,18 +131,7 @@ const Checkout = ({
       if (candyQty === 0) { setAlertMsg("購物車目前是空的，請先選購商品！（最低起訂量為 50 支）"); return; }
       if (candyQty < 50) { setAlertMsg(`總訂購量最低需達 50 支，目前僅 ${candyQty} 支。`); return; }
 
-      setIsCheckingDate(true);
-      try {
-        const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzf8kJ6Ka8yGabg--MCRJ8eyucBbsGRDbceGEeH-CQDLqOMXhTCysZVrPKL0MLpSg4L/exec';
-        const response = await fetch(`${SCRIPT_URL}?action=check_availability&date=${selectedDate}`);
-        const result = await response.json();
-        if (result.status === 'success' && candyQty > result.remaining) {
-          setAlertMsg(`非常抱歉，我們每日產能上限為 800 支。此日期目前剩餘可訂購額度為 ${result.remaining} 支。請微調數量或選擇其他日期，感謝體諒！🍡`);
-          return; 
-        }
-      } catch (error) {
-        setAlertMsg("系統暫時無法核對產能額度，請稍後再試。"); return;
-      } finally { setIsCheckingDate(false); }
+      // ✨ 已移除舊版 GAS 驗證邏輯，現在 Firebase 會在選擇日期時即時擋下，只要過得了這關就直接放行。
     }
 
     if (currentStep === 2) {
@@ -199,27 +192,71 @@ const Checkout = ({
         eventTime: finalEventTime,
         specificDetails: specificDetails,
         itemsList: Object.entries(cart).filter(([id, q]) => parseInt(id) !== 5 && q > 0).map(([id, q]) => `- ${products.find(p=>p.id===parseInt(id)).name} x${q}`).join('\n'),
-        candyTotal: candySubtotal, broomRent: broomRent, broomDeposit: broomDeposit, shippingFee: shippingFee,
-        totalAmount: totalPrice, notes: formData.notes || '未提供', cart: cart
+        candyTotal: candySubtotal, 
+        broomRent: broomRent, 
+        broomDeposit: broomDeposit, 
+        shippingFee: shippingFee,
+        totalAmount: totalPrice, 
+        notes: formData.notes || '未提供', 
+        cart: cart,
+        pdfDownloadUrl: "", // 預設空字串，稍後補上
+        createdAt: new Date().getTime(), // 排序用的時間戳記
+        isModified: false // 註記是否被後台修改過
     };
 
     try {
-      const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzf8kJ6Ka8yGabg--MCRJ8eyucBbsGRDbceGEeH-CQDLqOMXhTCysZVrPKL0MLpSg4L/exec';
-      const response = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
+      setSubmitMsg("正在將訂單安全地寫入資料庫中...");
+      
+      // ✨ 步驟 1：將訂單存入 Firebase Firestore
+      const ordersRef = collection(db, "orders");
+      const docRef = await addDoc(ordersRef, payload);
+      const firestoreDocumentId = docRef.id;
+
+      setSubmitMsg("正在為您生成專屬 PDF 訂單明細與發送通知...");
+
+      // ✨ 步驟 2：呼叫 GAS 微服務產 PDF 及通知
+      const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL;
+      const gasPayload = { ...payload, action: 'create_order' }; 
+      
+      const response = await fetch(SCRIPT_URL, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
+        body: JSON.stringify(gasPayload) 
+      });
       const result = await response.json();
+
       if (result.status === 'success') { 
-        onOrderSuccess({ payload, orderNumber: payload.orderNumber, cart: { ...cart }, candyQty, broomQty, candySubtotal, broomRent, broomDeposit, shippingFee, totalPrice, pdfDownloadUrl: result.pdfDownloadUrl }); 
-      } else { setAlertMsg(result.message); }
-    } catch (error) { setAlertMsg(["⚠️ 連線失敗", error.message]); } 
-    finally { setIsSubmitting(false); }
+        // ✨ 步驟 3：GAS 成功產出 PDF，將網址更新回 Firebase 訂單中
+        const finalPdfUrl = result.pdfDownloadUrl;
+        const orderDocToUpdate = doc(db, "orders", firestoreDocumentId);
+        await updateDoc(orderDocToUpdate, {
+          pdfDownloadUrl: finalPdfUrl
+        });
+
+        // 成功，觸發完成畫面
+        onOrderSuccess({ 
+          payload, 
+          orderNumber: payload.orderNumber, 
+          cart: { ...cart }, 
+          candyQty, broomQty, candySubtotal, broomRent, broomDeposit, shippingFee, totalPrice, 
+          pdfDownloadUrl: finalPdfUrl 
+        }); 
+      } else { 
+        setAlertMsg(result.message); 
+      }
+    } catch (error) { 
+      setAlertMsg(["⚠️ 連線失敗", error.message]); 
+    } finally { 
+      setIsSubmitting(false); 
+    }
   };
 
   // ==========================================
-  // 🖼️ UI 渲染組合[cite: 8]
+  // 🖼️ UI 渲染組合
   // ==========================================
   return (
     <>
-      {/* 💡 智慧載入遮罩[cite: 8] */}
+      {/* 💡 智慧載入遮罩 */}
       {(isSubmitting || isCheckingDate) && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-darkWood/60 backdrop-blur-sm transition-opacity">
           <div className="bg-pureWhite p-8 md:p-10 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm w-[90%] mx-auto text-center animate-[fadeIn_0.3s_ease-out]">
@@ -257,7 +294,8 @@ const Checkout = ({
           />
 
           <section className="w-full lg:w-7/12 bg-pureWhite/65 backdrop-blur-[12px] border border-pureWhite shadow-xl rounded-2xl p-6 md:p-8">
-            {currentStep === 1 && <Step1Event formData={formData} handleFormChange={handleFormChange} getMinDate={getMinDate} />}
+            {/* ✨ 傳入 currentTotalQty 給 Step1Event */}
+            {currentStep === 1 && <Step1Event formData={formData} handleFormChange={handleFormChange} getMinDate={getMinDate} currentTotalQty={candyQty} />}
             {currentStep === 2 && <Step2Location formData={formData} handleFormChange={handleFormChange} />}
             {currentStep === 3 && <Step3Contact formData={formData} handleFormChange={handleFormChange} isSameAsOrderer={isSameAsOrderer} setIsSameAsOrderer={setIsSameAsOrderer} />}
             {currentStep === 4 && (

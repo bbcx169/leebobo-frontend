@@ -216,8 +216,9 @@ export default function OrderTable({
                         </div>
                       </td>
 
+                      {/* ✨ 修正處：相容 Firebase 裡的 totalAmount 欄位名稱 */}
                       <td className="px-4 py-5 text-right font-black text-gray-900 text-xl whitespace-nowrap">
-                        NT$ {order.totalPrice?.toLocaleString()}
+                        NT$ {(order.totalPrice || order.totalAmount)?.toLocaleString()}
                       </td>
 
                       <td className="px-4 py-5 text-center sticky right-0 bg-white group-hover:bg-gray-50 transition-colors z-10 shadow-[-4px_0_10px_-3px_rgba(0,0,0,0.05)] border-l border-gray-50">

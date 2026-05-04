@@ -3,8 +3,12 @@ import { products } from '../constants/data';
 import useScrollFadeIn from '../hooks/useScrollFadeIn';
 import OrderReceipt from '../components/OrderReceipt';
 
-// 💡 讀取環境變數 API，並加上備用網址（雙保險防連線失敗）
-const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzf8kJ6Ka8yGabg--MCRJ8eyucBbsGRDbceGEeH-CQDLqOMXhTCysZVrPKL0MLpSg4L/exec';
+// ✨ 新增 Firebase 相關引入
+import { db } from '../utils/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+
+// 💡 寄送 Email 還是需要 GAS 微服務，所以保留 SCRIPT_URL
+const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL;
 
 const OrderInquiry = ({ setAlertMsg }) => {
   // 載入與訂購流程一致的滾動淡入動畫邏輯
@@ -22,7 +26,7 @@ const OrderInquiry = ({ setAlertMsg }) => {
   const [isResending, setIsResending] = useState(false);
   const [isPdfDownloaded, setIsPdfDownloaded] = useState(false);
 
-  // --- 查詢 API 邏輯 ---
+  // --- ✨ 全新 Firebase 查詢 API 邏輯 ---
   const handleInquirySubmit = async (e) => {
     e.preventDefault();
     setIsPdfDownloaded(false);
@@ -31,7 +35,6 @@ const OrderInquiry = ({ setAlertMsg }) => {
         return; 
     }
 
-    // 💡 第三道防線：送出前嚴格檢查是否剛好 10 位數
     if (inqPhone.length !== 10) {
         setAlertMsg("手機號碼格式錯誤，請輸入完整的 10 位數字！");
         return;
@@ -39,28 +42,36 @@ const OrderInquiry = ({ setAlertMsg }) => {
     
     setInqStatus('loading');
     try {
-        // 💡 透過 GET 請求執行 query_order
-        const url = `${SCRIPT_URL}?action=query_order&name=${encodeURIComponent(inqName)}&phone=${encodeURIComponent(inqPhone)}&date=${encodeURIComponent(inqDate)}`;
-        const res = await fetch(url);
-        const resData = await res.json();
+        // 1. 指向 Firestore 的 orders 集合
+        const ordersRef = collection(db, "orders");
         
-        if (resData.status === 'success') {
-            if (resData.data.length > 1) {
-                setInqMatches(resData.data); 
-                setInqStatus('multiple_matches');
-            } else if (resData.data.length === 1) {
-                setInqMatches(resData.data); 
-                setInqData(resData.data[0]); 
-                setResendEmail(resData.data[0].ordererEmail || ''); 
-                setInqStatus('success');
-            } else { 
-                setInqStatus('not_found'); 
+        // 2. 為了避免 Firebase 索引設定的麻煩，我們先用「手機號碼」把該顧客的訂單全抓出來
+        const q = query(ordersRef, where("ordererPhone", "==", inqPhone));
+        const querySnapshot = await getDocs(q);
+        
+        // 3. 在前端用 JavaScript 過濾「姓名」與「日期」都吻合的訂單
+        const matchedOrders = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.ordererName === inqName && data.eventDate === inqDate) {
+                matchedOrders.push(data);
             }
+        });
+
+        // 4. 判斷查詢結果
+        if (matchedOrders.length > 1) {
+            setInqMatches(matchedOrders); 
+            setInqStatus('multiple_matches');
+        } else if (matchedOrders.length === 1) {
+            setInqMatches(matchedOrders); 
+            setInqData(matchedOrders[0]); 
+            setResendEmail(matchedOrders[0].ordererEmail || ''); 
+            setInqStatus('success');
         } else { 
             setInqStatus('not_found'); 
         }
     } catch (err) { 
-        console.error(err); 
+        console.error("Firebase 查詢失敗:", err); 
         setInqStatus('error');
         setAlertMsg(["⚠️ 查詢連線失敗", "請檢查您的網路連線，或稍後再重試。"]);
     }
@@ -75,7 +86,7 @@ const OrderInquiry = ({ setAlertMsg }) => {
     }
   };
 
-  // 💡 處理補寄 Email 的 API 請求
+  // 💡 處理補寄 Email 的 API 請求 (呼叫 GAS)
   const handleResendEmail = async () => {
       if (!resendEmail) { 
           setAlertMsg("請輸入聯絡信箱！"); 
@@ -86,7 +97,6 @@ const OrderInquiry = ({ setAlertMsg }) => {
           const response = await fetch(SCRIPT_URL, {
               method: 'POST',
               headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              // 💡 這裡將 action 修改為後端統一的 'resendPdf'，解決 Unknown action 錯誤
               body: JSON.stringify({ 
                   action: 'resendPdf', 
                   orderNumber: inqData.orderNumber, 
@@ -112,12 +122,10 @@ const OrderInquiry = ({ setAlertMsg }) => {
       setShowEmailPrompt(false);
       setIsPdfDownloaded(false);
       
-      // 如果有多筆符合的訂單，返回到列表頁
       if (inqMatches.length > 1) {
           setInqStatus('multiple_matches');
           setInqData(null);
       } else {
-          // 如果只有一筆，就回到最初的空表單狀態
           setInqStatus('idle');
           setInqName('');
           setInqPhone('');
@@ -157,7 +165,8 @@ const OrderInquiry = ({ setAlertMsg }) => {
                         }} className="bg-pureWhite/80 hover:bg-white border border-warmWood/30 hover:border-amberRed cursor-pointer p-5 rounded-xl shadow-sm hover:shadow-md transition-all flex justify-between items-center group">
                             <div>
                                 <p className="font-bold text-darkWood mb-1 text-lg">訂購時間：{order.orderDate} {order.orderTime}</p>
-                                <p className="text-sm text-darkWood/70">總金額：NT$ {order.totalPrice.toLocaleString()}</p>
+                                {/* ✨ 修正此處的變數名稱為 totalAmount */}
+                                <p className="text-sm text-darkWood/70">總金額：NT$ {order.totalAmount?.toLocaleString()}</p>
                             </div>
                             <div className="text-amberRed transform group-hover:translate-x-2 transition-transform">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
@@ -184,7 +193,6 @@ const OrderInquiry = ({ setAlertMsg }) => {
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-darkWood mb-1">訂購人手機號碼</label>
-                        {/* 💡 第一道與第二道防線：過濾非數字字元，並且限制最大長度為 10 */}
                         <input 
                             type="tel" 
                             required 
@@ -227,11 +235,12 @@ const OrderInquiry = ({ setAlertMsg }) => {
                             cart: inqData.cart, 
                             candyQty: Object.entries(inqData.cart).reduce((s, [id, q]) => parseInt(id) !== 5 ? s + q : s, 0),
                             broomQty: inqData.cart['5'] || 0, 
-                            candySubtotal: inqData.candySubtotal, 
+                            // ✨ 修正屬性名稱以對應 Firebase 存入的鍵值
+                            candySubtotal: inqData.candyTotal, 
                             broomRent: inqData.broomRent,
                             broomDeposit: inqData.broomDeposit, 
                             shippingFee: inqData.shippingFee, 
-                            totalPrice: inqData.totalPrice
+                            totalPrice: inqData.totalAmount 
                         }} 
                         products={products}
                     />

@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import liff from '@line/liff';
 
+// 🚀 引入 Firebase 相關方法
+import { db } from '../utils/firebase';
+import { collection, getDocs, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+
 // 🚀 引入展示元件
 import DashboardStats from '../components/Admin/DashboardStats';
 import OrderTable from '../components/Admin/OrderTable';
@@ -10,7 +14,6 @@ import RevenueReport from '../components/Admin/RevenueReport';
 // ==========================================
 // 全域常數設定
 // ==========================================
-// 🚀 核心修改：僅讀取環境變數，移除備用寫死網址
 const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL;
 const LIFF_ID = '2009807397-WPVPBokl';
 
@@ -23,9 +26,9 @@ export default function AdminDashboard() {
   // ==========================================
   // 1. 核心狀態管理
   // ==========================================
-  const [authStatus, setAuthStatus] = useState('checking'); // checking, unauth, unauthorized_user, logged_in
+  const [authStatus, setAuthStatus] = useState('checking'); 
   const [userProfile, setUserProfile] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, orders, revenue, settings
+  const [activeTab, setActiveTab] = useState('dashboard'); 
   
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [orders, setOrders] = useState([]);
@@ -103,10 +106,18 @@ export default function AdminDashboard() {
   const fetchOrders = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${SCRIPT_URL}?action=get_all_orders`);
-      const data = await res.json();
-      if (data.status === 'success') setOrders(data.data);
+      const ordersRef = collection(db, "orders");
+      const q = query(ordersRef, orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+      
+      const ordersData = [];
+      querySnapshot.forEach((doc) => {
+        ordersData.push({ id: doc.id, ...doc.data() });
+      });
+      
+      setOrders(ordersData);
     } catch (err) {
+      console.error("Firebase 獲取訂單失敗:", err);
       setAlertMsg("無法取得訂單資料，請檢查網路連線");
     } finally {
       setIsLoading(false);
@@ -183,22 +194,43 @@ export default function AdminDashboard() {
   // ==========================================
   // 4. 業務事件處理
   // ==========================================
+  
+  // ✨ 核心修正：同步更新 Firebase 與 GAS PDF
   const handleUpdateOrderTime = async () => {
     if (!editModal.eventDate || !editModal.eventTime) return alert("請填寫日期與時間");
     setIsUpdating(true);
+    
     try {
-      await callGasApi({ 
-        action: 'update_order_time', 
-        orderNumber: editModal.order.orderNumber, 
-        newDate: editModal.eventDate, 
-        newTime: editModal.eventTime,
-        newDetails: editModal.specificDetails,
-        newNotes: editModal.notes
+      // 1. 準備完整的訂單資料（PdfService 需要 cart 等資訊才能渲染）
+      const updatedOrderData = {
+        ...editModal.order, // 原始訂單完整內容
+        eventDate: editModal.eventDate,
+        eventTime: editModal.eventTime,
+        specificDetails: editModal.specificDetails,
+        notes: editModal.notes,
+        action: 'update_pdf' // 指定 GAS 執行 PDF 更新動作
+      };
+
+      // 2. 呼叫 GAS 微服務產出新 PDF
+      const gasResult = await callGasApi(updatedOrderData);
+      const newPdfUrl = gasResult.pdfDownloadUrl;
+
+      // 3. 更新 Firebase Firestore 資料庫
+      const orderRef = doc(db, "orders", editModal.order.id);
+      await updateDoc(orderRef, {
+        eventDate: editModal.eventDate,
+        eventTime: editModal.eventTime,
+        specificDetails: editModal.specificDetails,
+        notes: editModal.notes,
+        pdfDownloadUrl: newPdfUrl, // 更新為新的 PDF 連結
+        isModified: true
       });
-      setAlertMsg("✅ 訂單與 PDF 已成功更新！");
+      
+      setAlertMsg("✅ 訂單資料與 PDF 已成功更新！");
       setEditModal({ isOpen: false, order: null, eventDate: '', eventTime: '', specificDetails: '', notes: '' });
-      fetchOrders();
+      fetchOrders(); 
     } catch (err) {
+      console.error("更新失敗:", err);
       setAlertMsg("❌ 更新失敗：" + err.message);
     } finally {
       setIsUpdating(false);

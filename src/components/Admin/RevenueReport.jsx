@@ -1,16 +1,29 @@
 import React, { useState, useEffect } from 'react';
+// ✨ 1. 引入 Firebase 相關方法
+import { db } from '../../utils/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+
+// 產品對照表 (用於計算排行)
+const PRODUCTS = {
+  '1': { name: '蕃茄 (小/喜糖)', price: 20 },
+  '2': { name: '蕃茄蜜餞 (小/喜糖)', price: 25 },
+  '3': { name: '鳥梨 (小/喜糖)', price: 20 },
+  '4': { name: '蕃茄+鳥梨 (小/喜糖)', price: 20 },
+  '5': { name: '承租掃帚', price: 2000 },
+  '6': { name: '蕃茄 (經典)', price: 30 },
+  '7': { name: '蕃茄蜜餞 (經典)', price: 35 },
+  '8': { name: '鳥梨 (經典)', price: 35 }
+};
 
 /**
- * RevenueReport - 營收報表組件
- * 功能：顯示月度財務摘要、押金統計與商品銷量排行
+ * RevenueReport - 營收報表組件 (Firebase 版本)
  */
-export default function RevenueReport({ scriptUrl }) {
+export default function RevenueReport() {
   // ==========================================
   // 1. 狀態管理
   // ==========================================
   const [targetMonth, setTargetMonth] = useState(() => {
     const now = new Date();
-    // 預設顯示當前月份
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [reportData, setReportData] = useState(null);
@@ -18,30 +31,65 @@ export default function RevenueReport({ scriptUrl }) {
   const [error, setError] = useState(null);
 
   // ==========================================
-  // 2. 取得報表資料 API
+  // 2. ✨ 從 Firebase 取得資料並在前端計算報表
   // ==========================================
   const fetchReport = async (month) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(scriptUrl, {
-        method: 'POST',
-        // 注意：GAS 的 doPost 需要 JSON 字串
-        body: JSON.stringify({
-          action: 'generate_monthly_report',
-          targetMonth: month
-        })
+      const ordersRef = collection(db, "orders");
+      const querySnapshot = await getDocs(ordersRef);
+
+      let actualRevenue = 0;
+      let totalDeposit = 0;
+      let flavorCounts = {};
+      let matchedOrdersCount = 0;
+
+      querySnapshot.forEach((doc) => {
+        const order = doc.data();
+        
+        // 篩選出「活動日期」開頭符合目標月份的訂單 (例如 "2026-05")
+        if (order.eventDate && order.eventDate.startsWith(month)) {
+          matchedOrdersCount++;
+
+          // 計算金額
+          const candySub = Number(order.candyTotal) || 0; 
+          const bRent = Number(order.broomRent) || 0;    
+          const bDep = Number(order.broomDeposit) || 0;
+          const ship = Number(order.shippingFee) || 0;
+
+          actualRevenue += (candySub + bRent + ship);
+          totalDeposit += bDep;
+
+          // 計算商品口味銷量
+          if (order.cart) {
+            Object.entries(order.cart).forEach(([id, qty]) => {
+              if (id !== '5' && qty > 0) { 
+                const flavorName = PRODUCTS[id] ? PRODUCTS[id].name : `口味_${id}`;
+                flavorCounts[flavorName] = (flavorCounts[flavorName] || 0) + qty;
+              }
+            });
+          }
+        }
       });
-      const result = await response.json();
-      
-      if (result.status === 'success') {
-        setReportData(result.data);
-      } else {
-        setError(result.message || '取得報表失敗');
-      }
+
+      // 將口味統計轉換為陣列並排序 (由高到低)
+      const sortedFlavors = Object.keys(flavorCounts)
+        .sort((a, b) => flavorCounts[b] - flavorCounts[a])
+        .map(name => ({ name, count: flavorCounts[name] }));
+
+      // 更新畫面資料
+      setReportData({ 
+        targetMonth: month, 
+        actualRevenue, 
+        totalDeposit, 
+        orderCount: matchedOrdersCount, 
+        flavorStats: sortedFlavors 
+      });
+
     } catch (err) {
-      console.error("Fetch Report Error:", err);
-      setError('網路連線錯誤，請確認 GAS API 部署狀態');
+      console.error("Firebase 獲取報表失敗:", err);
+      setError('無法讀取資料庫，請確認網路連線或 Firebase 狀態');
     } finally {
       setIsLoading(false);
     }
@@ -49,8 +97,8 @@ export default function RevenueReport({ scriptUrl }) {
 
   // 初始載入
   useEffect(() => {
-    if (scriptUrl) fetchReport(targetMonth);
-  }, [scriptUrl]);
+    fetchReport(targetMonth);
+  }, []);
 
   // 處理月份變更
   const handleMonthChange = (e) => {
@@ -187,7 +235,7 @@ export default function RevenueReport({ scriptUrl }) {
             {/* 頁尾提醒 */}
             <div className="bg-creamBg/30 p-6 text-center border-t border-gray-50">
               <p className="text-xs text-gray-400 font-bold tracking-wide">
-                💡 提示：本報表數據已同步寫入 Google Sheets 「月報表」分頁，可隨時導出作為會計憑證。
+                💡 提示：本報表數據已直接由 Firebase 資料庫即時運算產生。
               </p>
             </div>
           </div>
