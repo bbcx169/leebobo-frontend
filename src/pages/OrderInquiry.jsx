@@ -56,17 +56,6 @@ const sendGasRequest = async (payload) => {
 };
 
 const getOrderCreatedTime = (order) => {
-  const createdAt = order.createdAt;
-  if (typeof createdAt === 'number') return createdAt;
-  if (createdAt instanceof Date) return createdAt.getTime();
-  if (createdAt?.toMillis) return createdAt.toMillis();
-  if (typeof createdAt?.seconds === 'number') return createdAt.seconds * 1000;
-  if (typeof createdAt?._seconds === 'number') return createdAt._seconds * 1000;
-  if (typeof createdAt === 'string') {
-    const numericCreatedAt = Number(createdAt);
-    if (!Number.isNaN(numericCreatedAt) && numericCreatedAt > 0) return numericCreatedAt;
-  }
-
   const dateParts = String(order.orderDate || '')
     .split(/[/-]/)
     .map(part => Number(part));
@@ -80,7 +69,22 @@ const getOrderCreatedTime = (order) => {
     return new Date(year, month - 1, day, hour || 0, minute || 0, second || 0).getTime();
   }
 
+  const createdAt = order.createdAt;
+  if (typeof createdAt === 'number') return createdAt;
+  if (createdAt instanceof Date) return createdAt.getTime();
+  if (createdAt?.toMillis) return createdAt.toMillis();
+  if (typeof createdAt?.seconds === 'number') return createdAt.seconds * 1000;
+  if (typeof createdAt?._seconds === 'number') return createdAt._seconds * 1000;
+  if (typeof createdAt === 'string') {
+    const numericCreatedAt = Number(createdAt);
+    if (!Number.isNaN(numericCreatedAt) && numericCreatedAt > 0) return numericCreatedAt;
+  }
+
   return 0;
+};
+
+const sortOrdersNewestFirst = (orders) => {
+  return [...orders].sort((a, b) => getOrderCreatedTime(b) - getOrderCreatedTime(a));
 };
 
 const OrderInquiry = ({ setAlertMsg }) => {
@@ -131,16 +135,16 @@ const OrderInquiry = ({ setAlertMsg }) => {
             }
         });
 
-        matchedOrders.sort((a, b) => getOrderCreatedTime(b) - getOrderCreatedTime(a));
+        const sortedMatchedOrders = sortOrdersNewestFirst(matchedOrders);
 
         // 4. 判斷查詢結果
-        if (matchedOrders.length > 1) {
-            setInqMatches(matchedOrders); 
+        if (sortedMatchedOrders.length > 1) {
+            setInqMatches(sortedMatchedOrders); 
             setInqStatus('multiple_matches');
-        } else if (matchedOrders.length === 1) {
-            setInqMatches(matchedOrders); 
-            setInqData(matchedOrders[0]); 
-            setResendEmail(matchedOrders[0].ordererEmail || ''); 
+        } else if (sortedMatchedOrders.length === 1) {
+            setInqMatches(sortedMatchedOrders); 
+            setInqData(sortedMatchedOrders[0]); 
+            setResendEmail(sortedMatchedOrders[0].ordererEmail || ''); 
             setInqStatus('success');
         } else { 
             setInqStatus('not_found'); 
@@ -237,7 +241,7 @@ const OrderInquiry = ({ setAlertMsg }) => {
                 <p className="text-darkWood/80 font-medium mb-8 text-center">您在同一天有多筆預約，請選擇您要查看的明細：</p>
                 
                 <div className="space-y-4">
-                    {inqMatches.map((order, idx) => (
+                    {sortOrdersNewestFirst(inqMatches).map((order, idx) => (
                         <div key={idx} onClick={() => { 
                             setInqData(order); 
                             setResendEmail(order.ordererEmail || ''); 
