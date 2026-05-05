@@ -4,6 +4,27 @@ import OrderReceipt from '../components/OrderReceipt';
 // 💡 引入商品目錄資料，解決明細變成空白的問題！
 import { products } from '../constants/data'; 
 
+const GAS_SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec";
+
+const parseGasResponse = async (response) => {
+  const responseText = await response.text();
+  const trimmedText = responseText.trim();
+
+  if (!trimmedText) {
+    throw new Error("GAS returned an empty response. Please check the Apps Script deployment.");
+  }
+
+  if (trimmedText.startsWith("<")) {
+    throw new Error("GAS returned an HTML page instead of JSON. Please check the Apps Script Web App URL and access permissions.");
+  }
+
+  try {
+    return JSON.parse(trimmedText);
+  } catch (error) {
+    throw new Error(`Unable to parse GAS response: ${error.message}`);
+  }
+};
+
 const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
   const [isPdfDownloaded, setIsPdfDownloaded] = useState(false);
   
@@ -49,9 +70,15 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
     setEmailErrMsg('');
 
     try {
-      const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL;
+      if (!GAS_SCRIPT_URL) {
+        throw new Error("GAS Web App URL is not configured.");
+      }
+
+      if (!submittedOrder?.pdfDownloadUrl) {
+        throw new Error("PDF has not been generated yet. Please contact the shop to resend the order details.");
+      }
       
-      const response = await fetch(SCRIPT_URL, {
+      const response = await fetch(GAS_SCRIPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
@@ -61,7 +88,7 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
         })
       });
       
-      const result = await response.json();
+      const result = await parseGasResponse(response);
       if (result.status === 'success') {
         setEmailStatus('success');
         // 成功後 3 秒自動收合輸入框
@@ -72,7 +99,7 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
       }
     } catch (error) {
       setEmailStatus('error');
-      setEmailErrMsg("網路連線異常，請稍後再試");
+      setEmailErrMsg(error.message || "網路連線異常，請稍後再試");
     }
   };
 
