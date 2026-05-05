@@ -6,6 +6,7 @@ import DashboardStats from '../components/Admin/DashboardStats';
 import OrderTable from '../components/Admin/OrderTable';
 import AdminModals from '../components/Admin/AdminModals';
 import RevenueReport from '../components/Admin/RevenueReport';
+import { products } from '../constants/data';
 import {
   SCRIPT_URL,
   callGasApi,
@@ -18,6 +19,11 @@ import {
   searchAdminOrders,
   updateAdminOrder
 } from '../utils/adminOrdersApi';
+import {
+  fetchProductAvailability,
+  normalizeProductAvailability,
+  saveProductAvailability
+} from '../utils/productAvailability';
 
 const LIFF_ID = '2009807397-WPVPBokl';
 const ORDER_PAGE_SIZE = 50;
@@ -67,6 +73,7 @@ function AdminDashboardContent() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
   const [settings, setSettings] = useState({ reminderEnabled: true, reminderTime: '11:00' });
+  const [productAvailability, setProductAvailability] = useState(() => normalizeProductAvailability());
   const [alertMsg, setAlertMsg] = useState(null);
 
   const [editModal, setEditModal] = useState(emptyEditModal);
@@ -122,6 +129,12 @@ function AdminDashboardContent() {
     enabled: authStatus === 'logged_in'
   });
 
+  const productAvailabilityQuery = useQuery({
+    queryKey: ['productAvailability'],
+    queryFn: fetchProductAvailability,
+    enabled: authStatus === 'logged_in'
+  });
+
   const searchQuery = useQuery({
     queryKey: ['adminOrderSearch', searchMode, rawSearchTerm],
     queryFn: () => searchAdminOrders(rawSearchTerm),
@@ -134,10 +147,14 @@ function AdminDashboardContent() {
   );
 
   useEffect(() => {
-    if (settingsQuery.data) {
-      setSettings(settingsQuery.data);
-    }
+    if (settingsQuery.data) setSettings(settingsQuery.data);
   }, [settingsQuery.data]);
+
+  useEffect(() => {
+    if (productAvailabilityQuery.data) {
+      setProductAvailability(productAvailabilityQuery.data);
+    }
+  }, [productAvailabilityQuery.data]);
 
   const displayedOrders = rawSearchTerm
     ? (isSupportedSearch ? (searchQuery.data ?? []) : [])
@@ -222,6 +239,19 @@ function AdminDashboardContent() {
     }
   });
 
+  const saveProductAvailabilityMutation = useMutation({
+    mutationFn: saveProductAvailability,
+    onSuccess: (availability) => {
+      setProductAvailability(availability);
+      setAlertMsg('商品上下架狀態已更新。');
+      queryClient.invalidateQueries({ queryKey: ['productAvailability'] });
+    },
+    onError: (err) => {
+      console.error('Save product availability failed:', err);
+      setAlertMsg(`商品上下架儲存失敗：${err.message}`);
+    }
+  });
+
   const handleLogin = () => liff.login({ redirectUri: window.location.href });
   const handleLogout = () => {
     liff.logout();
@@ -293,12 +323,19 @@ function AdminDashboardContent() {
     saveSettingsMutation.mutate(settings);
   };
 
+  const handleProductAvailabilityChange = (productId, isAvailable) => {
+    setProductAvailability(prev => ({
+      ...prev,
+      [String(productId)]: isAvailable
+    }));
+  };
+
+  const handleSaveProductAvailability = () => {
+    saveProductAvailabilityMutation.mutate(productAvailability);
+  };
+
   if (authStatus === 'checking') {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gray-50 text-2xl font-bold">
-        載入中...
-      </div>
-    );
+    return <div className="h-screen flex items-center justify-center bg-gray-50 text-2xl font-bold">載入中...</div>;
   }
 
   if (authStatus === 'unauth') {
@@ -308,22 +345,14 @@ function AdminDashboardContent() {
           <div className="absolute top-10 w-full max-w-sm z-50">
             <div className="bg-red-50 text-red-600 font-bold px-6 py-4 rounded-2xl shadow-lg border border-red-200 text-center mx-auto relative">
               {alertMsg}
-              <button
-                onClick={() => setAlertMsg(null)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-700"
-              >
-                x
-              </button>
+              <button onClick={() => setAlertMsg(null)} className="absolute right-4 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-700">x</button>
             </div>
           </div>
         )}
 
         <div className="bg-white p-10 md:p-12 rounded-3xl shadow-xl text-center max-w-md w-full">
           <h1 className="text-3xl font-bold text-amberRed mb-8 tracking-widest">後台管理登入</h1>
-          <button
-            onClick={handleLogin}
-            className="w-full bg-[#06C755] text-white px-10 py-5 rounded-2xl font-bold text-xl shadow-lg hover:scale-105 transition-transform mb-6"
-          >
+          <button onClick={handleLogin} className="w-full bg-[#06C755] text-white px-10 py-5 rounded-2xl font-bold text-xl shadow-lg hover:scale-105 transition-transform mb-6">
             使用 LINE 登入
           </button>
           <div className="flex items-center gap-3 my-8">
@@ -340,11 +369,7 @@ function AdminDashboardContent() {
               onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
               className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-lg outline-none focus:ring-2 focus:ring-gray-400 text-center tracking-widest placeholder:tracking-normal"
             />
-            <button
-              onClick={handlePasswordLogin}
-              disabled={isVerifyingPwd}
-              className="w-full bg-gray-800 text-white px-10 py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-black transition-colors disabled:opacity-50"
-            >
+            <button onClick={handlePasswordLogin} disabled={isVerifyingPwd} className="w-full bg-gray-800 text-white px-10 py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-black transition-colors disabled:opacity-50">
               {isVerifyingPwd ? '驗證中...' : '密碼登入'}
             </button>
           </div>
@@ -354,11 +379,7 @@ function AdminDashboardContent() {
   }
 
   if (authStatus === 'unauthorized_user') {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gray-50 text-red-500 font-bold text-2xl">
-        無權限：此 LINE 帳號不是管理員。
-      </div>
-    );
+    return <div className="h-screen flex items-center justify-center bg-gray-50 text-red-500 font-bold text-2xl">無權限：此 LINE 帳號不是管理員。</div>;
   }
 
   const navItems = [
@@ -368,21 +389,14 @@ function AdminDashboardContent() {
     { id: 'settings', icon: '⚙️', label: '系統設定' }
   ];
 
-  const isLoading = ordersQuery.isLoading || settingsQuery.isLoading;
+  const isLoading = ordersQuery.isLoading || settingsQuery.isLoading || productAvailabilityQuery.isLoading;
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100 text-darkWood">
       <aside className={`fixed md:static inset-y-0 left-0 bg-white shadow-xl z-50 flex flex-col transition-all duration-300 ease-in-out ${isSidebarExpanded ? 'w-64' : 'w-20'} ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-4 border-b border-gray-100 flex items-center justify-between overflow-hidden">
-          {isSidebarExpanded ? (
-            <h1 className="text-2xl font-bold text-amberRed tracking-widest whitespace-nowrap">後台管理</h1>
-          ) : (
-            <span className="text-2xl font-bold text-amberRed mx-auto">管</span>
-          )}
-          <button
-            onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-            className="hidden md:flex items-center justify-center w-8 h-8 hover:bg-gray-100 rounded-full transition-colors"
-          >
+          {isSidebarExpanded ? <h1 className="text-2xl font-bold text-amberRed tracking-widest whitespace-nowrap">後台管理</h1> : <span className="text-2xl font-bold text-amberRed mx-auto">管</span>}
+          <button onClick={() => setIsSidebarExpanded(!isSidebarExpanded)} className="hidden md:flex items-center justify-center w-8 h-8 hover:bg-gray-100 rounded-full transition-colors">
             <svg className={`w-5 h-5 text-gray-400 transition-transform ${isSidebarExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 5l7 7-7 7M5 5l7 7-7 7" strokeWidth="2" /></svg>
           </button>
         </div>
@@ -419,19 +433,11 @@ function AdminDashboardContent() {
         </nav>
 
         <div className="p-3 border-t border-gray-100 space-y-2">
-          <button
-            onClick={() => { window.location.href = '/leebobo-frontend/'; }}
-            className={`w-full py-3 flex items-center justify-center text-lg text-gray-600 font-bold hover:bg-gray-50 rounded-2xl transition-colors border border-transparent hover:border-gray-100 ${isSidebarExpanded ? 'px-4' : 'px-0'}`}
-            title="回到網站首頁"
-          >
+          <button onClick={() => { window.location.href = '/leebobo-frontend/'; }} className={`w-full py-3 flex items-center justify-center text-lg text-gray-600 font-bold hover:bg-gray-50 rounded-2xl transition-colors border border-transparent hover:border-gray-100 ${isSidebarExpanded ? 'px-4' : 'px-0'}`} title="回到網站首頁">
             <span>↩</span>
             {isSidebarExpanded && <span className="ml-2">回到首頁</span>}
           </button>
-          <button
-            onClick={handleLogout}
-            className={`w-full py-3 flex items-center justify-center text-lg text-red-500 font-bold hover:bg-red-50 rounded-2xl transition-colors border border-red-50 ${isSidebarExpanded ? 'px-4' : 'px-0'}`}
-            title="登出"
-          >
+          <button onClick={handleLogout} className={`w-full py-3 flex items-center justify-center text-lg text-red-500 font-bold hover:bg-red-50 rounded-2xl transition-colors border border-red-50 ${isSidebarExpanded ? 'px-4' : 'px-0'}`} title="登出">
             <span>⏻</span>
             {isSidebarExpanded && <span className="ml-2">登出</span>}
           </button>
@@ -441,20 +447,12 @@ function AdminDashboardContent() {
       <main className="flex-1 overflow-y-auto p-6 md:p-10 relative scrollbar-hide">
         {isLoading && (
           <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-20 flex items-center justify-center">
-            <div className="bg-white px-8 py-4 rounded-full shadow-2xl text-amberRed font-bold text-xl animate-pulse">
-              載入資料中...
-            </div>
+            <div className="bg-white px-8 py-4 rounded-full shadow-2xl text-amberRed font-bold text-xl animate-pulse">載入資料中...</div>
           </div>
         )}
 
         {activeTab === 'dashboard' && (
-          <DashboardStats
-            orders={orders}
-            selectedDate={selectedDate}
-            setSelectedDate={setSelectedDate}
-            dailyOrders={dailyOrders}
-            dailyMaterials={dailyMaterials}
-          />
+          <DashboardStats orders={orders} selectedDate={selectedDate} setSelectedDate={setSelectedDate} dailyOrders={dailyOrders} dailyMaterials={dailyMaterials} />
         )}
 
         {activeTab === 'orders' && (
@@ -490,46 +488,71 @@ function AdminDashboardContent() {
         )}
 
         {activeTab === 'settings' && (
-          <div className="max-w-3xl mx-auto space-y-8 animate-[fadeIn_0.3s_ease-out]">
+          <div className="max-w-5xl mx-auto space-y-8 animate-[fadeIn_0.3s_ease-out]">
             <header>
               <h2 className="text-4xl font-bold text-gray-800">系統設定</h2>
-              <p className="text-xl text-gray-500 mt-2">管理 LINE 提醒與後台通知設定。</p>
+              <p className="text-xl text-gray-500 mt-2">管理提醒設定與前台商品上下架狀態。</p>
             </header>
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+
+            <section className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+              <h3 className="text-2xl font-bold text-gray-800 mb-6 border-b border-gray-100 pb-4">商品上下架</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {products.map(product => {
+                  const isAvailable = productAvailability[String(product.id)] !== false;
+                  return (
+                    <div key={product.id} className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-gray-50/70">
+                      <img src={product.image} alt={product.name} className={`w-16 h-16 rounded-xl object-cover bg-white ${isAvailable ? '' : 'grayscale opacity-60'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-gray-800 truncate">{product.name}</p>
+                        <p className={`text-sm font-bold mt-1 ${isAvailable ? 'text-green-600' : 'text-red-600'}`}>
+                          {isAvailable ? '上架中' : '暫停販售'}
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isAvailable}
+                          onChange={e => handleProductAvailabilityChange(product.id, e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-14 h-8 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:bg-amberRed after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:after:translate-x-6"></div>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="pt-6 mt-6 border-t border-gray-100 flex justify-end">
+                <button
+                  onClick={handleSaveProductAvailability}
+                  disabled={saveProductAvailabilityMutation.isPending}
+                  className="px-10 py-3 bg-amberRed text-white font-bold text-lg rounded-2xl hover:bg-red-800 transition-colors shadow-lg disabled:opacity-50"
+                >
+                  {saveProductAvailabilityMutation.isPending ? '儲存中...' : '儲存商品狀態'}
+                </button>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <h3 className="text-2xl font-bold text-gray-800 mb-6 border-b border-gray-100 pb-4">LINE 提醒設定</h3>
               <div className="space-y-8">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-6">
                   <div>
                     <label className="text-xl font-bold text-gray-700">啟用提醒</label>
                     <p className="text-base text-gray-400 mt-1">開啟後會依照設定時間推送管理提醒。</p>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={settings.reminderEnabled}
-                    onChange={e => setSettings({ ...settings, reminderEnabled: e.target.checked })}
-                    className="w-8 h-8 accent-amberRed rounded-lg cursor-pointer"
-                  />
+                  <input type="checkbox" checked={settings.reminderEnabled} onChange={e => setSettings({ ...settings, reminderEnabled: e.target.checked })} className="w-8 h-8 accent-amberRed rounded-lg cursor-pointer" />
                 </div>
                 <div className={`transition-all ${settings.reminderEnabled ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
                   <label className="block text-lg font-bold text-gray-700 mb-3">提醒時間</label>
-                  <input
-                    type="time"
-                    value={settings.reminderTime}
-                    onChange={e => setSettings({ ...settings, reminderTime: e.target.value })}
-                    className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-xl outline-none focus:ring-2 focus:ring-amberRed"
-                  />
+                  <input type="time" value={settings.reminderTime} onChange={e => setSettings({ ...settings, reminderTime: e.target.value })} className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-xl outline-none focus:ring-2 focus:ring-amberRed" />
                 </div>
                 <div className="pt-6 border-t border-gray-100">
-                  <button
-                    onClick={handleSaveSettings}
-                    disabled={saveSettingsMutation.isPending}
-                    className="px-12 py-4 bg-darkWood text-white font-bold text-xl rounded-2xl hover:bg-black transition-all shadow-lg disabled:opacity-50"
-                  >
+                  <button onClick={handleSaveSettings} disabled={saveSettingsMutation.isPending} className="px-12 py-4 bg-darkWood text-white font-bold text-xl rounded-2xl hover:bg-black transition-all shadow-lg disabled:opacity-50">
                     {saveSettingsMutation.isPending ? '儲存中...' : '儲存設定'}
                   </button>
                 </div>
               </div>
-            </div>
+            </section>
           </div>
         )}
 
@@ -551,10 +574,7 @@ function AdminDashboardContent() {
         />
       </main>
 
-      <button
-        onClick={() => setIsMobileMenuOpen(true)}
-        className="md:hidden fixed top-6 right-6 z-40 bg-white p-4 rounded-full shadow-2xl border border-gray-200 text-amberRed"
-      >
+      <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden fixed top-6 right-6 z-40 bg-white p-4 rounded-full shadow-2xl border border-gray-200 text-amberRed">
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" strokeWidth="2.5" strokeLinecap="round" /></svg>
       </button>
       {isMobileMenuOpen && <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)}></div>}

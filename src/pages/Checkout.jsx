@@ -15,6 +15,7 @@ import Step2Location from '../components/checkout/Step2Location';
 import Step3Contact from '../components/checkout/Step3Contact';
 import Step4Confirm from '../components/checkout/Step4Confirm';
 import { formatSpecificDetails } from '../utils/orderDetails';
+import { fetchProductAvailability, normalizeProductAvailability } from '../utils/productAvailability';
 
 const GAS_SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec";
 
@@ -55,6 +56,7 @@ const Checkout = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingDate, setIsCheckingDate] = useState(false);
   const [isSameAsOrderer, setIsSameAsOrderer] = useState(false);
+  const [productAvailability, setProductAvailability] = useState(() => normalizeProductAvailability());
 
   // 💡 智慧提示語狀態
   const [submitMsg, setSubmitMsg] = useState("系統正在處理您的訂單，請稍候...");
@@ -101,12 +103,34 @@ const Checkout = ({
     }
   }, [formData.deliveryCity, formData.eventType]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchProductAvailability()
+      .then((availability) => {
+        if (isMounted) setProductAvailability(availability);
+      })
+      .catch((err) => {
+        console.error('Failed to load product availability:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // ==========================================
   // 🧮 金額與物流計算
   // ==========================================
-  const broomQty = cart[5] || 0; 
-  const candyQty = Object.entries(cart).reduce((sum, [id, qty]) => parseInt(id) !== 5 ? sum + qty : sum, 0);
-  const candySubtotal = Object.entries(cart).reduce((total, [id, qty]) => {
+  const availableCart = Object.fromEntries(
+    Object.entries(cart).filter(([id]) => productAvailability[String(id)] !== false)
+  );
+  const unavailableCartItems = Object.entries(cart)
+    .filter(([id, qty]) => qty > 0 && productAvailability[String(id)] === false)
+    .map(([id]) => products.find(product => product.id === parseInt(id))?.name || `商品 ${id}`);
+  const broomQty = availableCart[5] || 0; 
+  const candyQty = Object.entries(availableCart).reduce((sum, [id, qty]) => parseInt(id) !== 5 ? sum + qty : sum, 0);
+  const candySubtotal = Object.entries(availableCart).reduce((total, [id, qty]) => {
     if (parseInt(id) === 5) return total;
     const product = products.find(p => p.id === parseInt(id));
     return total + (product ? product.price * qty : 0);
@@ -145,6 +169,11 @@ const Checkout = ({
   };
 
   const nextStep = async () => {
+    if (currentStep === 1 && unavailableCartItems.length > 0) {
+      setAlertMsg(`購物車內含已停售商品：${unavailableCartItems.join('、')}。請回商品頁重新選購。`);
+      return;
+    }
+
     if (currentStep === 1) {
       if (!formData.eventType || !(formData.weddingDate || formData.generalDate)) { setAlertMsg("請先選擇活動類型與日期。"); return; }
       const selectedDate = formData.weddingDate || formData.generalDate;
@@ -185,6 +214,11 @@ const Checkout = ({
 
   const handleSubmitOrder = async (e) => {
     e.preventDefault();
+    if (unavailableCartItems.length > 0) {
+      setAlertMsg(`購物車內含已停售商品：${unavailableCartItems.join('、')}。請回商品頁重新選購。`);
+      return;
+    }
+
     setIsSubmitting(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     
@@ -215,14 +249,14 @@ const Checkout = ({
         detailAddress: detailAddress || '',
         fullAddress: fullAddress || '',
         specificDetails: specificDetails,
-        itemsList: Object.entries(cart).filter(([id, q]) => parseInt(id) !== 5 && q > 0).map(([id, q]) => `- ${products.find(p=>p.id===parseInt(id)).name} x${q}`).join('\n'),
+        itemsList: Object.entries(availableCart).filter(([id, q]) => parseInt(id) !== 5 && q > 0).map(([id, q]) => `- ${products.find(p=>p.id===parseInt(id)).name} x${q}`).join('\n'),
         candyTotal: candySubtotal, 
         broomRent: broomRent, 
         broomDeposit: broomDeposit, 
         shippingFee: shippingFee,
         totalAmount: totalPrice, 
         notes: formData.notes || '未提供', 
-        cart: cart,
+        cart: availableCart,
         pdfDownloadUrl: "", // 預設空字串，稍後補上
         createdAt: new Date().getTime(), // 排序用的時間戳記
         isModified: false // 註記是否被後台修改過
@@ -286,7 +320,7 @@ const Checkout = ({
         payload, 
         firestoreDocumentId,
         orderNumber: payload.orderNumber, 
-        cart: { ...cart }, 
+        cart: { ...availableCart }, 
         candyQty, broomQty, candySubtotal, broomRent, broomDeposit, shippingFee, totalPrice, 
         pdfDownloadUrl: finalPdfUrl 
       }); 
@@ -334,7 +368,7 @@ const Checkout = ({
 
         <main className="flex flex-col lg:flex-row gap-8 items-start">
           <CartSummary 
-            cart={cart} updateCart={updateCart} handleQuantityChange={handleQuantityChange} navigateTo={navigateTo}
+            cart={availableCart} updateCart={updateCart} handleQuantityChange={handleQuantityChange} navigateTo={navigateTo}
             candyQty={candyQty} broomQty={broomQty} candySubtotal={candySubtotal} broomRent={broomRent}
             broomDeposit={broomDeposit} shippingFee={shippingFee} shippingHint={shippingHint} totalPrice={totalPrice}
           />
@@ -346,7 +380,7 @@ const Checkout = ({
             {currentStep === 3 && <Step3Contact formData={formData} handleFormChange={handleFormChange} isSameAsOrderer={isSameAsOrderer} setIsSameAsOrderer={setIsSameAsOrderer} />}
             {currentStep === 4 && (
               <Step4Confirm 
-                formData={formData} cart={cart} products={products} candyQty={candyQty} broomQty={broomQty} 
+                formData={formData} cart={availableCart} products={products} candyQty={candyQty} broomQty={broomQty} 
                 candySubtotal={candySubtotal} broomRent={broomRent} broomDeposit={broomDeposit} 
                 shippingFee={shippingFee} shippingHint={shippingHint} totalPrice={totalPrice} 
               />
