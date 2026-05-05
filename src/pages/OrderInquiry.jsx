@@ -55,6 +55,15 @@ const sendGasRequest = async (payload) => {
   }
 };
 
+const getOrderCreatedTime = (order) => {
+  if (order.createdAt) return Number(order.createdAt) || 0;
+
+  const dateText = String(order.orderDate || '').replace(/\//g, '-');
+  const timeText = order.orderTime || '00:00:00';
+  const timestamp = new Date(`${dateText} ${timeText}`).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
 const OrderInquiry = ({ setAlertMsg }) => {
   // 載入與訂購流程一致的滾動淡入動畫邏輯
   useScrollFadeIn();
@@ -102,6 +111,8 @@ const OrderInquiry = ({ setAlertMsg }) => {
                 matchedOrders.push(data);
             }
         });
+
+        matchedOrders.sort((a, b) => getOrderCreatedTime(b) - getOrderCreatedTime(a));
 
         // 4. 判斷查詢結果
         if (matchedOrders.length > 1) {
