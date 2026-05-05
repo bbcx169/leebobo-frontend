@@ -16,6 +16,27 @@ import Step3Contact from '../components/checkout/Step3Contact';
 import Step4Confirm from '../components/checkout/Step4Confirm';
 import { formatSpecificDetails } from '../utils/orderDetails';
 
+const GAS_SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec";
+
+const parseGasResponse = async (response) => {
+  const responseText = await response.text();
+  const trimmedText = responseText.trim();
+
+  if (!trimmedText) {
+    throw new Error("GAS returned an empty response. Please check the Apps Script deployment.");
+  }
+
+  if (trimmedText.startsWith("<")) {
+    throw new Error("GAS returned an HTML page instead of JSON. Please check the Apps Script Web App URL and access permissions.");
+  }
+
+  try {
+    return JSON.parse(trimmedText);
+  } catch (error) {
+    throw new Error(`Unable to parse GAS response: ${error.message}`);
+  }
+};
+
 const Checkout = ({ 
   cart, 
   updateCart, 
@@ -215,35 +236,45 @@ const Checkout = ({
       setSubmitMsg("正在為您生成專屬 PDF 訂單明細與發送通知...");
 
       // ✨ 步驟 2：呼叫 GAS 微服務產 PDF 及通知
-      const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec";
       const gasPayload = { ...payload, action: 'create_order' }; 
+      let finalPdfUrl = "";
       
-      const response = await fetch(SCRIPT_URL, { 
+      try {
+        const response = await fetch(GAS_SCRIPT_URL, { 
         method: 'POST', 
         headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
         body: JSON.stringify(gasPayload) 
-      });
-      const result = await response.json();
+        });
+        const result = await parseGasResponse(response);
 
-      if (result.status === 'success') { 
+        if (result.status !== 'success') {
+          throw new Error(result.message || "GAS did not finish PDF generation.");
+        }
         // ✨ 步驟 3：GAS 成功產出 PDF，將網址更新回 Firebase 訂單中
-        const finalPdfUrl = result.pdfDownloadUrl;
+        finalPdfUrl = result.pdfDownloadUrl || "";
         const orderDocToUpdate = doc(db, "orders", firestoreDocumentId);
         await updateDoc(orderDocToUpdate, {
           pdfDownloadUrl: finalPdfUrl
         });
 
         // 成功，觸發完成畫面
-        onOrderSuccess({ 
-          payload, 
-          orderNumber: payload.orderNumber, 
-          cart: { ...cart }, 
-          candyQty, broomQty, candySubtotal, broomRent, broomDeposit, shippingFee, totalPrice, 
-          pdfDownloadUrl: finalPdfUrl 
-        }); 
-      } else { 
-        setAlertMsg(result.message); 
+      } catch (gasError) {
+        console.warn("Order was saved, but GAS PDF/notification failed:", gasError);
+        setAlertMsg([
+          "訂單已成立，但 PDF/通知服務暫時沒有完成。",
+          "請不要重複送出訂單；店家仍可在後台看到這筆訂單。",
+          `訂單編號：${payload.orderNumber}`,
+          `技術訊息：${gasError.message}`
+        ]);
       }
+
+      onOrderSuccess({ 
+        payload, 
+        orderNumber: payload.orderNumber, 
+        cart: { ...cart }, 
+        candyQty, broomQty, candySubtotal, broomRent, broomDeposit, shippingFee, totalPrice, 
+        pdfDownloadUrl: finalPdfUrl 
+      }); 
     } catch (error) { 
       setAlertMsg(["⚠️ 連線失敗", error.message]); 
     } finally { 
