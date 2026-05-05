@@ -327,7 +327,7 @@ const Checkout = ({
 
           <section className="w-full lg:w-7/12 bg-pureWhite/65 backdrop-blur-[12px] border border-pureWhite shadow-xl rounded-2xl p-6 md:p-8">
             {/* ✨ 傳入 currentTotalQty 給 Step1Event */}
-            {currentStep === 1 && <Step1Event formData={formData} handleFormChange={handleFormChange} getMinDate={getMinDate} currentTotalQty={candyQty} />}
+            {currentStep === 1 && <Step1Event formData={formData} handleFormChange={handleFormChange} getMinDate={getMinDate} currentTotalQty={candyQty} setAlertMsg={setAlertMsg} />}
             {currentStep === 2 && <Step2Location formData={formData} handleFormChange={handleFormChange} />}
             {currentStep === 3 && <Step3Contact formData={formData} handleFormChange={handleFormChange} isSameAsOrderer={isSameAsOrderer} setIsSameAsOrderer={setIsSameAsOrderer} />}
             {currentStep === 4 && (

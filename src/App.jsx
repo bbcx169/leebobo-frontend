@@ -124,6 +124,9 @@ function AppContent() {
   };
 
   const isAdminRoute = location.pathname.startsWith('/admin');
+  const alertTitle = alertMsg?.title || '系統提示';
+  const alertContent = alertMsg?.messages || alertMsg;
+  const alertTone = alertMsg?.tone || 'default';
 
   // ==========================================
   // 後台專屬畫面渲染
@@ -198,18 +201,30 @@ function AppContent() {
       {alertMsg && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
           <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => setAlertMsg(null)}></div>
-          <div className="bg-pureWhite rounded-2xl shadow-2xl p-6 md:p-8 max-w-md w-full mx-4 relative z-10 fade-in-up is-visible">
-            <h3 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">系統提示</h3>
+          <div className="bg-pureWhite rounded-2xl shadow-2xl p-6 md:p-8 max-w-md w-full mx-4 relative z-10 fade-in-up is-visible border border-pureWhite">
+            <div className="flex items-start gap-4 mb-5 pb-4 border-b border-warmWood/20">
+              <div className={`w-11 h-11 rounded-full flex shrink-0 items-center justify-center ${alertTone === 'warning' ? 'bg-amberRed/10 text-amberRed' : 'bg-warmWood/15 text-darkWood'}`}>
+                {alertTone === 'warning' ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" /></svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25 12 12m0 0 .75.75M12 12l-.75.75M12 12l.75-.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                )}
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-darkWood font-serif tracking-wide">{alertTitle}</h3>
+                {alertTone === 'warning' && <p className="text-xs text-amberRed font-bold mt-1">請調整訂購內容後再繼續</p>}
+              </div>
+            </div>
             <div className="text-gray-700 mb-6 text-sm leading-relaxed text-left">
-              {Array.isArray(alertMsg) ? (
+              {Array.isArray(alertContent) ? (
                 <ul className="space-y-2">
-                  {alertMsg.map((m, idx) => (
+                  {alertContent.map((m, idx) => (
                     <li key={idx} className={m.includes('⚠️') || m.includes('✅') ? "text-amberRed font-bold text-base" : m.includes('💡') ? "text-gray-400 text-xs mt-4 break-all" : "text-gray-700"}>
                       {m}
                     </li>
                   ))}
                 </ul>
-              ) : alertMsg}
+              ) : alertContent}
             </div>
             <button onClick={() => setAlertMsg(null)} className="w-full bg-amberRed hover:bg-darkWood text-white font-bold py-3 rounded-xl transition-colors">我知道了</button>
           </div>

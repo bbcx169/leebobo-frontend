@@ -2,8 +2,17 @@ import React, { useState } from 'react';
 import { db } from '../../utils/firebase'; 
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
-const Step1Event = ({ formData, handleFormChange, getMinDate, currentTotalQty = 0 }) => {
+const Step1Event = ({ formData, handleFormChange, getMinDate, currentTotalQty = 0, setAlertMsg }) => {
   const [isChecking, setIsChecking] = useState(false);
+
+  const showAlert = (message) => {
+    if (setAlertMsg) {
+      setAlertMsg(message);
+      return;
+    }
+
+    alert(Array.isArray(message?.messages) ? message.messages.join('\n') : message);
+  };
 
   const handleDateValidation = async (e) => {
     // ⚠️ 必須在進入非同步 (await) 之前，先把這些值「拷貝」保存下來
@@ -44,7 +53,15 @@ const Step1Event = ({ formData, handleFormChange, getMinDate, currentTotalQty = 
 
       // 判斷額度是否足夠
       if (remaining < currentTotalQty) {
-        alert(`非常抱歉，為堅持手工新鮮製作的品質，我們每日產能上限為 800 支。\n\n您選擇的日期目前剩餘可訂購額度為 ${remaining} 支。\n\n請微調數量或選擇其他日期，感謝您的體諒！🍡`);
+        showAlert({
+          title: '當日可訂購額度不足',
+          messages: [
+            '為維持手工新鮮製作的品質，我們每日產能上限為 800 支。',
+            `您選擇的日期目前剩餘可訂購額度為 ${remaining} 支，目前購物車共 ${currentTotalQty} 支。`,
+            '請微調數量，或選擇其他日期，謝謝您的體諒。'
+          ],
+          tone: 'warning'
+        });
         
         // 額度不足，強迫把剛剛寫入的日期清空
         handleFormChange({ target: { name: inputName, value: '' } });
@@ -53,7 +70,11 @@ const Step1Event = ({ formData, handleFormChange, getMinDate, currentTotalQty = 
       }
     } catch (error) {
       console.error('日期驗證失敗:', error);
-      alert('系統暫時無法核對產能額度，請稍後再試。');
+      showAlert({
+        title: '暫時無法核對產能',
+        messages: ['系統目前無法確認當日可製作額度，請稍後再試。'],
+        tone: 'warning'
+      });
       
       // 發生錯誤為求安全，也清空日期
       handleFormChange({ target: { name: inputName, value: '' } });
