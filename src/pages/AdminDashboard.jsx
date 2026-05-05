@@ -14,7 +14,7 @@ import RevenueReport from '../components/Admin/RevenueReport';
 // ==========================================
 // 全域常數設定
 // ==========================================
-const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL;
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec';
 const LIFF_ID = '2009807397-WPVPBokl';
 
 const productMapping = {
