@@ -16,7 +16,13 @@ export default function AdminModals({
   resendModal, 
   setResendModal, 
   isResending, 
-  onResendPDF
+  onResendPDF,
+
+  // 刪除訂單狀態與事件
+  deleteModal,
+  setDeleteModal,
+  isDeleting,
+  onDeleteOrder
 }) {
 
   // 🚀 修正：將屬性名稱從 location 改為 specificDetails，確保與後端對接
@@ -180,6 +186,50 @@ export default function AdminModals({
                 className="flex-1 px-4 py-2.5 bg-amberRed text-white font-bold rounded-xl hover:bg-red-800 transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
               >
                 {isResending ? '發送中...' : '確認發送'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. 刪除訂單 Modal */}
+      {deleteModal?.isOpen && (
+        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl border border-red-100 animate-[fadeIn_0.2s_ease-out]">
+            <h3 className="text-xl font-bold text-gray-900 mb-2 border-b border-gray-100 pb-3 flex items-center gap-2">
+              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path></svg>
+              刪除訂單
+            </h3>
+            <div className="text-sm text-gray-600 mb-4 mt-3 leading-relaxed">
+              <p>即將刪除 Firebase Firestore 中的訂單：</p>
+              <p className="mt-2 font-bold text-gray-900">#{deleteModal.order?.orderNumber}</p>
+              <p className="mt-2 text-red-600 font-bold">此操作無法復原，請輸入完整訂單編號後再刪除。</p>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-xs font-bold text-gray-400 mb-1">確認訂單編號</label>
+              <input
+                type="text"
+                value={deleteModal.confirmText || ''}
+                onChange={e => setDeleteModal({ ...deleteModal, confirmText: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none"
+                placeholder={`請輸入 ${deleteModal.order?.orderNumber || ''}`}
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteModal({ isOpen: false, order: null, confirmText: '' })}
+                className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={onDeleteOrder}
+                disabled={isDeleting || deleteModal.confirmText !== deleteModal.order?.orderNumber}
+                className="flex-1 px-4 py-2.5 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+              >
+                {isDeleting ? '刪除中...' : '確認刪除'}
               </button>
             </div>
           </div>

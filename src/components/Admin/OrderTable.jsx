@@ -46,7 +46,8 @@ export default function OrderTable({
   setSearchTerm, 
   filteredOrders, 
   onEditClick, 
-  onResendClick 
+  onResendClick,
+  onDeleteClick
 }) {
   // 🚀 1. 新增狀態過濾：預設為 'pending' (未完成)
   const [statusFilter, setStatusFilter] = useState('pending'); // 'pending' | 'completed' | 'all'
@@ -263,6 +264,7 @@ export default function OrderTable({
                         <div className="flex flex-col xl:flex-row items-center justify-center gap-2">
                           <button onClick={() => onEditClick(order)} className="w-full xl:w-auto px-3 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-xl text-sm font-bold border border-blue-200 shadow-sm transition-all whitespace-nowrap">修改資訊</button>
                           <button onClick={() => onResendClick(order)} className="w-full xl:w-auto px-3 py-2 bg-white text-amberRed hover:bg-red-50 rounded-xl text-sm font-bold border border-amberRed/30 shadow-sm transition-all whitespace-nowrap">補發 PDF</button>
+                          <button onClick={() => onDeleteClick(order)} className="w-full xl:w-auto px-3 py-2 bg-gray-100 text-gray-500 hover:bg-red-600 hover:text-white rounded-xl text-sm font-bold border border-gray-200 hover:border-red-600 shadow-sm transition-all whitespace-nowrap">刪除</button>
                         </div>
                       </td>
                     </tr>

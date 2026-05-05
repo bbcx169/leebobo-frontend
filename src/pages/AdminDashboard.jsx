@@ -3,7 +3,7 @@ import liff from '@line/liff';
 
 // 🚀 引入 Firebase 相關方法
 import { db } from '../utils/firebase';
-import { collection, getDocs, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 
 // 🚀 引入展示元件
 import DashboardStats from '../components/Admin/DashboardStats';
@@ -43,6 +43,8 @@ export default function AdminDashboard() {
   
   const [resendModal, setResendModal] = useState({ isOpen: false, order: null, email: '' });
   const [isResending, setIsResending] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, order: null, confirmText: '' });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [editModal, setEditModal] = useState({ 
     isOpen: false, 
@@ -256,6 +258,32 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDeleteOrder = async () => {
+    const targetOrder = deleteModal.order;
+    if (!targetOrder?.id) {
+      setAlertMsg("❌ 無法刪除：這筆訂單缺少 Firebase 文件 ID。");
+      return;
+    }
+
+    if (deleteModal.confirmText !== targetOrder.orderNumber) {
+      setAlertMsg("請輸入完整訂單編號，確認後才能刪除。");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, "orders", targetOrder.id));
+      setOrders(prev => prev.filter(order => order.id !== targetOrder.id));
+      setDeleteModal({ isOpen: false, order: null, confirmText: '' });
+      setAlertMsg(`✅ 訂單 #${targetOrder.orderNumber} 已從 Firebase Firestore 刪除。`);
+    } catch (err) {
+      console.error("刪除訂單失敗:", err);
+      setAlertMsg("❌ 刪除失敗：" + err.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleSaveSettings = async () => {
     setIsSavingSettings(true);
     try {
@@ -400,6 +428,7 @@ export default function AdminDashboard() {
               notes: o.notes || ''
             })}
             onResendClick={(o) => setResendModal({ isOpen: true, order: o, email: o.ordererEmail || '' })}
+            onDeleteClick={(o) => setDeleteModal({ isOpen: true, order: o, confirmText: '' })}
           />
         )}
         {activeTab === 'revenue' && (
@@ -438,6 +467,7 @@ export default function AdminDashboard() {
           alertMsg={alertMsg} setAlertMsg={setAlertMsg}
           editModal={editModal} setEditModal={setEditModal} isUpdating={isUpdating} onUpdateOrderTime={handleUpdateOrderTime}
           resendModal={resendModal} setResendModal={setResendModal} isResending={isResending} onResendPDF={handleResendPDF}
+          deleteModal={deleteModal} setDeleteModal={setDeleteModal} isDeleting={isDeleting} onDeleteOrder={handleDeleteOrder}
         />
       </main>
       <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden fixed top-6 right-6 z-40 bg-white p-4 rounded-full shadow-2xl border border-gray-200 text-amberRed">
