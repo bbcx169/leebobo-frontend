@@ -1,19 +1,22 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-// 這裡的設定值，你要去 Firebase 控制台的「專案設定 > 一般」裡面複製
-// 我們把它們對應到 Vite 的環境變數 (import.meta.env)
+/**
+ * 這些資訊來自您的 Firebase 控制台專案設定。
+ * 直接寫入字串可避免部署至 GitHub Pages 時產生的環境變數讀取失敗。
+ */
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: "AIzaSyCBD_M8WxA_a3Q47w9llaFgujPFI9C7zEI",
+  authDomain: "leebobo-frontend.firebaseapp.com",
+  projectId: "leebobo-frontend",
+  storageBucket: "leebobo-frontend.firebasestorage.app",
+  messagingSenderId: "667004373559",
+  appId: "1:667004373559:web:6dd3cefe831bf56ca74db2"
 };
 
 // 初始化 Firebase 應用程式
 const app = initializeApp(firebaseConfig);
 
-// 初始化並導出 Firestore 資料庫實例，以後其他檔案要讀寫資料庫都從這裡 import
+// 初始化並導出 Firestore 資料庫實例
+// 以後其他檔案（如 AdminDashboard）要讀寫資料庫都從這裡 import db
 export const db = getFirestore(app);

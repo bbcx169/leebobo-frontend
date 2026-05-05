@@ -12,12 +12,12 @@
 const NOTIFY_EMAIL = 'bbcx169@gmail.com';
 
 // 💬 LINE Messaging API 設定
-const LINE_CHANNEL_ACCESS_TOKEN = '';
-const LINE_ADMIN_USER_ID = '';
+const LINE_CHANNEL_ACCESS_TOKEN = 'Szz8gLG1ZeHuVW9DoTRtFf86tmxkfl4k0uGmD1xttmvdZIvQ800W/UDGJ23GeYjdHA/pCFm2oabZC/u3JQ+crvIMwwNHStr8ulYPPBtHwoKul2vFm97nUWvBkdmCqM1v8vxdCIcRbUGlBWkawcj9ZwdB04t89/1O/w1cDnyilFU=';
+const LINE_ADMIN_USER_ID = ['U4460cd7d1f421c42d6dbf0f07253580e'];
 
 // Telegram Bot API settings
-const TELEGRAM_BOT_TOKEN = '';
-const TELEGRAM_CHAT_ID = '';
+const TELEGRAM_BOT_TOKEN = '8610077153:AAHBvpzWgGZ9EzKSZ3b5cp7wv82EFkkNBBA';
+const TELEGRAM_CHAT_ID = '1095695500, -1003908376977';
 
 function setTelegramNotificationProperties(botToken, chatId) {
   if (!botToken || !chatId) {
@@ -33,7 +33,7 @@ function setTelegramNotificationProperties(botToken, chatId) {
 }
 
 // 🔐 權限與安全 (備用密碼)
-const ADMIN_LINE_IDS = 'U4460cd7d1f421c42d6dbf0f07253580e';
+const ADMIN_LINE_IDS = ['U4460cd7d1f421c42d6dbf0f07253580e'];
 const ADMIN_PASSWORD = 'leebobo_admin';
 
 // 📁 雲端硬碟 PDF 資料夾設定
