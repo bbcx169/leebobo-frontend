@@ -5,7 +5,7 @@ import OrderReceipt from '../components/OrderReceipt';
 
 // ✨ 新增 Firebase 相關引入
 import { db } from '../utils/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc as firestoreDoc, updateDoc } from 'firebase/firestore';
 
 // 💡 寄送 Email 還是需要 GAS 微服務，所以保留 SCRIPT_URL
 const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec";
@@ -96,8 +96,8 @@ const OrderInquiry = ({ setAlertMsg }) => {
         
         // 3. 在前端用 JavaScript 過濾「姓名」與「日期」都吻合的訂單
         const matchedOrders = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
+        querySnapshot.forEach((orderDoc) => {
+            const data = { id: orderDoc.id, ...orderDoc.data() };
             if (data.ordererName === inqName && data.eventDate === inqDate) {
                 matchedOrders.push(data);
             }
@@ -139,11 +139,8 @@ const OrderInquiry = ({ setAlertMsg }) => {
       }
       setIsResending(true);
       try {
-          if (!inqData?.pdfDownloadUrl) {
-              throw new Error("尚未取得 PDF 連結，請稍後再試或聯繫客服。");
-          }
-
           const result = await sendGasRequest({ 
+              ...inqData,
               action: 'resendPdf', 
               orderNumber: inqData.orderNumber, 
               pdfDownloadUrl: inqData.pdfDownloadUrl,
@@ -151,6 +148,14 @@ const OrderInquiry = ({ setAlertMsg }) => {
           });
 
           if (result.status === 'success') {
+              if (result.pdfDownloadUrl && inqData.id) {
+                  const updatedOrder = { ...inqData, pdfDownloadUrl: result.pdfDownloadUrl };
+                  await updateDoc(firestoreDoc(db, "orders", inqData.id), {
+                      pdfDownloadUrl: result.pdfDownloadUrl
+                  });
+                  setInqData(updatedOrder);
+                  setInqMatches(prev => prev.map(order => order.id === inqData.id ? updatedOrder : order));
+              }
               setAlertMsg("✅ 訂單 PDF 明細已成功補發至您的信箱！"); 
               setShowEmailPrompt(false);
           } else { 

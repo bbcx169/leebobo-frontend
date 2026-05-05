@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import OrderReceipt from '../components/OrderReceipt';
 // 💡 引入商品目錄資料，解決明細變成空白的問題！
 import { products } from '../constants/data'; 
+import { db } from '../utils/firebase';
+import { doc as firestoreDoc, updateDoc } from 'firebase/firestore';
 
 const GAS_SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec";
 
@@ -53,6 +55,7 @@ const sendGasRequest = async (payload) => {
 
 const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
   const [isPdfDownloaded, setIsPdfDownloaded] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState(submittedOrder?.pdfDownloadUrl || '');
   
   // 💡 寄送 Email 相關狀態
   const [showEmailInput, setShowEmailInput] = useState(false);
@@ -65,6 +68,7 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
     if (submittedOrder?.payload?.ordererEmail) {
       setEmailAddress(submittedOrder.payload.ordererEmail);
     }
+    setPdfUrl(submittedOrder?.pdfDownloadUrl || '');
   }, [submittedOrder]);
 
   // 💡 智慧導航處理
@@ -100,18 +104,21 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
         throw new Error("GAS Web App URL is not configured.");
       }
 
-      if (!submittedOrder?.pdfDownloadUrl) {
-        throw new Error("PDF has not been generated yet. Please contact the shop to resend the order details.");
-      }
-      
       const result = await sendGasRequest({
+        ...submittedOrder.payload,
         action: 'resendPdf',
         orderNumber: submittedOrder.orderNumber,
-        pdfDownloadUrl: submittedOrder.pdfDownloadUrl,
+        pdfDownloadUrl: pdfUrl,
         email: emailAddress
       });
 
       if (result.status === 'success') {
+        if (result.pdfDownloadUrl && submittedOrder.firestoreDocumentId) {
+          await updateDoc(firestoreDoc(db, "orders", submittedOrder.firestoreDocumentId), {
+            pdfDownloadUrl: result.pdfDownloadUrl
+          });
+          setPdfUrl(result.pdfDownloadUrl);
+        }
         setEmailStatus('success');
         // 成功後 3 秒自動收合輸入框
         setTimeout(() => setShowEmailInput(false), 3000);
@@ -191,7 +198,7 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
         
         <div className="flex flex-col sm:flex-row justify-center gap-4 mb-4 mt-6">
           <button 
-            onClick={() => handleDownloadPDF(submittedOrder.pdfDownloadUrl)} 
+            onClick={() => handleDownloadPDF(pdfUrl)} 
             className={`inline-flex items-center justify-center gap-2 text-white py-3.5 px-8 rounded-xl font-bold shadow-md transition-all w-full sm:w-auto ${isPdfDownloaded ? 'bg-[#06C755] hover:bg-[#05b34c]' : 'bg-[#3E2723] hover:bg-[#2A1A17]'}`}
           >
             {isPdfDownloaded ? (

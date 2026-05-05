@@ -26,7 +26,10 @@ function doPost(e) {
 
     // 2. 補發 PDF 至 Email
     if (data.action === 'admin_resend_pdf' || data.action === 'resendPdf') {
+      const resendLock = LockService.getScriptLock();
       try {
+        resendLock.waitLock(10000);
+
         if (!data.email) {
           return jsonResponse({ status: 'error', message: '缺少收件人 Email。' });
         }
@@ -34,15 +37,28 @@ function doPost(e) {
           return jsonResponse({ status: 'error', message: '缺少訂單編號。' });
         }
         
-        const file = findOrderPdfFile(data);
-        if (!file) {
-          return jsonResponse({
-            status: 'error',
-            message: `找不到訂單 ${data.orderNumber} 的 PDF 檔案，請先重新產生 PDF 後再補發。`
-          });
+        let file = findOrderPdfFile(data);
+        let blob;
+        let directUrl = data.pdfDownloadUrl || data.pdfUrl || "";
+
+        if (file) {
+          blob = file.getBlob().setName(`李伯伯糖葫蘆_訂單明細_${data.orderNumber}.pdf`);
+          directUrl = directUrl || `https://drive.google.com/uc?export=download&id=${file.getId()}`;
+        } else {
+          if (!data.cart) {
+            return jsonResponse({
+              status: 'error',
+              message: `找不到訂單 ${data.orderNumber} 的 PDF 檔案，且缺少訂單明細，無法重新產生 PDF。`
+            });
+          }
+
+          blob = PdfService.generateOrderPdfBlob(data);
+          const folder = DriveApp.getFolderById(PDF_FOLDER_ID);
+          file = folder.createFile(blob);
+          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          directUrl = `https://drive.google.com/uc?export=download&id=${file.getId()}`;
         }
 
-        const blob = file.getBlob().setName(`李伯伯糖葫蘆_訂單明細_${data.orderNumber}.pdf`);
         const customerMsg = `親愛的顧客您好：\n\n這是「李伯伯糖葫蘆」補發的訂單明細。\n訂單編號：${data.orderNumber}\n\n附件為您的訂單 PDF 檔，請查收。\n\n李伯伯糖葫蘆 敬上`;
         MailApp.sendEmail({ 
           to: data.email, 
@@ -51,9 +67,15 @@ function doPost(e) {
           attachments: [blob] 
         });
         
-        return jsonResponse({ status: 'success' });
+        return jsonResponse({ status: 'success', pdfDownloadUrl: directUrl });
       } catch (err) { 
         return jsonResponse({ status: 'error', message: err.toString() });
+      } finally {
+        try {
+          resendLock.releaseLock();
+        } catch (lockErr) {
+          Logger.log("Unable to release resend lock: " + lockErr.toString());
+        }
       }
     }
 

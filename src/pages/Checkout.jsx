@@ -270,6 +270,7 @@ const Checkout = ({
 
       onOrderSuccess({ 
         payload, 
+        firestoreDocumentId,
         orderNumber: payload.orderNumber, 
         cart: { ...cart }, 
         candyQty, broomQty, candySubtotal, broomRent, broomDeposit, shippingFee, totalPrice, 
