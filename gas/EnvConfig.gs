@@ -5,7 +5,7 @@
  * 李伯伯糖葫蘆 - 環境設定與全域參數 (EnvConfig.gs)
  * ==========================================
  * 此檔案存放微服務所需的 API Token、ID、價格對照表。
- * (註：資料庫已遷移至 Firebase，此處不再管理 Sheets 或產能上限)
+ * Firestore 為訂單主資料庫；Google Sheets 僅作為雲端硬碟中的營運報表副本。
  */
 
 // 📧 通知設定
@@ -38,6 +38,11 @@ const ADMIN_PASSWORD = 'leebobo_admin';
 
 // 📁 雲端硬碟 PDF 資料夾設定
 const PDF_FOLDER_ID = '1GrWJtbw51RTZ-a0fGkrCqbiLpLgOqxH7';
+
+// 📊 Google Sheets 訂單報表設定
+// 若留空，第一次同步訂單時會自動建立「李伯伯糖葫蘆訂單報表」，並把試算表 ID 存到 Script Properties。
+const ORDER_REPORT_SPREADSHEET_ID = '';
+const ORDER_REPORT_SHEET_NAME = '訂單報表';
 
 // 🛍️ 產品價格對照表 (用於計算總金額與 PDF 顯示)
 const PRODUCTS = {

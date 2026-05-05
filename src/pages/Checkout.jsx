@@ -211,6 +211,9 @@ const Checkout = ({
         eventType: formData.eventType === 'wedding' ? '浪漫婚禮 / 喜宴' : (formData.eventType === 'school' ? '校園活動 / 園遊會' : '其他'),
         eventDate: formData.weddingDate || formData.generalDate || '未提供', 
         eventTime: finalEventTime,
+        locationName: locationText || '',
+        detailAddress: detailAddress || '',
+        fullAddress: fullAddress || '',
         specificDetails: specificDetails,
         itemsList: Object.entries(cart).filter(([id, q]) => parseInt(id) !== 5 && q > 0).map(([id, q]) => `- ${products.find(p=>p.id===parseInt(id)).name} x${q}`).join('\n'),
         candyTotal: candySubtotal, 
@@ -236,7 +239,7 @@ const Checkout = ({
       setSubmitMsg("正在為您生成專屬 PDF 訂單明細與發送通知...");
 
       // ✨ 步驟 2：呼叫 GAS 微服務產 PDF 及通知
-      const gasPayload = { ...payload, action: 'create_order' }; 
+      const gasPayload = { ...payload, action: 'create_order', firestoreDocumentId }; 
       let finalPdfUrl = "";
       
       try {
@@ -247,15 +250,26 @@ const Checkout = ({
         });
         const result = await parseGasResponse(response);
 
-        if (result.status !== 'success') {
+        if (!['success', 'partial_success'].includes(result.status)) {
           throw new Error(result.message || "GAS did not finish PDF generation.");
         }
         // ✨ 步驟 3：GAS 成功產出 PDF，將網址更新回 Firebase 訂單中
         finalPdfUrl = result.pdfDownloadUrl || "";
         const orderDocToUpdate = doc(db, "orders", firestoreDocumentId);
         await updateDoc(orderDocToUpdate, {
-          pdfDownloadUrl: finalPdfUrl
+          pdfDownloadUrl: finalPdfUrl,
+          sheetSynced: result.sheetSynced === true,
+          sheetSyncError: result.sheetError || ''
         });
+
+        if (result.sheetSynced === false) {
+          setAlertMsg([
+            "訂單已成立，但 Google Sheets 報表暫時沒有同步成功。",
+            "請不要重複送出訂單；Firebase 與 PDF 已保留這筆訂單。",
+            `訂單編號：${payload.orderNumber}`,
+            `技術訊息：${result.sheetError || 'GAS 未回傳詳細錯誤'}`
+          ]);
+        }
 
         // 成功，觸發完成畫面
       } catch (gasError) {

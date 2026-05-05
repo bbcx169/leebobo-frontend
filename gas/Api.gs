@@ -6,6 +6,7 @@
  * 本 API 僅負責接收確立的訂單資料，進行：
  * 1. 產生 PDF 明細並上傳 Google Drive。
  * 2. 發送 LINE / Telegram / Email 通知。
+ * 3. 將訂單同步到 Google Sheets 營運報表。
  */
 
 // ==========================================
@@ -120,36 +121,65 @@ function doPost(e) {
 
     // 4. 處理新訂單 (更新顧客收執信件內容)
     if (data.action === 'create_order') {
-      const pdfBlob = PdfService.generateOrderPdfBlob(data);
-      const folder = DriveApp.getFolderById(PDF_FOLDER_ID);
-      const pdfFile = folder.createFile(pdfBlob);
-      pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      const directUrl = `https://drive.google.com/uc?export=download&id=${pdfFile.getId()}`;
-      
-      const messageContent = `🍡【新訂單通知】\n編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日：${data.eventDate} ${data.eventTime}\n[PDF連結]：\n${directUrl}`;
-      sendMerchantNotification(messageContent);
-      
-      if (typeof NOTIFY_EMAIL !== "undefined" && NOTIFY_EMAIL) {
-        MailApp.sendEmail({
-          to: NOTIFY_EMAIL, subject: `【系統通知】收到新訂單 - 編號 ${data.orderNumber}`,
-          body: `您好，系統已收到一筆新訂單。\n\n訂單編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日期：${data.eventDate} ${data.eventTime}\n\n詳情明細請參閱附件 PDF。`,
-          attachments: [pdfBlob]
-        });
-      }
+      const orderLock = LockService.getScriptLock();
+      try {
+        orderLock.waitLock(10000);
 
-      // ✨ 更新：寄信給顧客 (新版內容)
-      if (data.ordererEmail && data.ordererEmail !== '未提供') {
-        const customerContent = `親愛的顧客您好：\n\n感謝您預約「李伯伯糖葫蘆」！我們已收到您的訂單（編號：${data.orderNumber}）。\n附件為您的訂單明細 PDF 檔，請您核對內容是否正確。\n\n請務必加入 LINE 官方帳號留言，後續我們將由專人與您聯繫確認細節。若有任何疑問，歡迎隨時聯繫 LINE 官方帳號。\n期待在您的活動現場為您服務！\n\n李伯伯糖葫蘆 敬上`;
+        const pdfBlob = PdfService.generateOrderPdfBlob(data);
+        const folder = DriveApp.getFolderById(PDF_FOLDER_ID);
+        const pdfFile = folder.createFile(pdfBlob);
+        pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        const directUrl = `https://drive.google.com/uc?export=download&id=${pdfFile.getId()}`;
+
+        let sheetSynced = false;
+        let sheetError = "";
+        let sheetUrl = "";
+        try {
+          const sheetResult = upsertOrderReportRow(data, directUrl);
+          sheetSynced = sheetResult.synced;
+          sheetUrl = sheetResult.spreadsheetUrl;
+        } catch (sheetErr) {
+          sheetError = sheetErr.toString();
+          Logger.log("Order report sync failed for " + data.orderNumber + ": " + sheetError);
+        }
         
-        MailApp.sendEmail({ 
-          to: data.ordererEmail, 
-          subject: `【訂單明細】李伯伯糖葫蘆 - 訂單編號 ${data.orderNumber}`, 
-          body: customerContent, 
-          attachments: [pdfBlob] 
-        });
-      }
+        const messageContent = `🍡【新訂單通知】\n編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日：${data.eventDate} ${data.eventTime}\n報表同步：${sheetSynced ? '成功' : '失敗'}\n[PDF連結]：\n${directUrl}`;
+        sendMerchantNotification(messageContent);
+        
+        if (typeof NOTIFY_EMAIL !== "undefined" && NOTIFY_EMAIL) {
+          MailApp.sendEmail({
+            to: NOTIFY_EMAIL, subject: `【系統通知】收到新訂單 - 編號 ${data.orderNumber}`,
+            body: `您好，系統已收到一筆新訂單。\n\n訂單編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日期：${data.eventDate} ${data.eventTime}\n報表同步：${sheetSynced ? '成功' : '失敗'}${sheetError ? `\n同步錯誤：${sheetError}` : ''}\n\n詳情明細請參閱附件 PDF。`,
+            attachments: [pdfBlob]
+          });
+        }
 
-      return ContentService.createTextOutput(JSON.stringify({ 'status': 'success', 'pdfDownloadUrl': directUrl })).setMimeType(ContentService.MimeType.JSON);
+        // ✨ 更新：寄信給顧客 (新版內容)
+        if (data.ordererEmail && data.ordererEmail !== '未提供') {
+          const customerContent = `親愛的顧客您好：\n\n感謝您預約「李伯伯糖葫蘆」！我們已收到您的訂單（編號：${data.orderNumber}）。\n附件為您的訂單明細 PDF 檔，請您核對內容是否正確。\n\n請務必加入 LINE 官方帳號留言，後續我們將由專人與您聯繫確認細節。若有任何疑問，歡迎隨時聯繫 LINE 官方帳號。\n期待在您的活動現場為您服務！\n\n李伯伯糖葫蘆 敬上`;
+          
+          MailApp.sendEmail({ 
+            to: data.ordererEmail, 
+            subject: `【訂單明細】李伯伯糖葫蘆 - 訂單編號 ${data.orderNumber}`, 
+            body: customerContent, 
+            attachments: [pdfBlob] 
+          });
+        }
+
+        return jsonResponse({
+          status: 'success',
+          pdfDownloadUrl: directUrl,
+          sheetSynced: sheetSynced,
+          sheetError: sheetError,
+          sheetUrl: sheetUrl
+        });
+      } finally {
+        try {
+          orderLock.releaseLock();
+        } catch (lockErr) {
+          Logger.log("Unable to release order lock: " + lockErr.toString());
+        }
+      }
     }
 
     return ContentService.createTextOutput(JSON.stringify({ 'status': 'error', 'message': `未知的操作指令: ${data.action}` })).setMimeType(ContentService.MimeType.JSON);
@@ -213,6 +243,202 @@ function extractDriveFileId(url) {
 
 function escapeDriveQueryValue(value) {
   return String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+// ==========================================
+// 📊 Google Sheets 訂單報表同步
+// ==========================================
+const ORDER_REPORT_HEADERS = [
+  '同步時間',
+  '同步狀態',
+  'Firestore ID',
+  '訂單編號',
+  '訂單日期',
+  '訂單時間',
+  '活動日期',
+  '活動時間',
+  '活動類型',
+  '配送縣市',
+  '地點名稱',
+  '詳細地址',
+  '訂購人姓名',
+  '訂購人電話',
+  '訂購人 Email',
+  '收貨人姓名',
+  '收貨人電話',
+  '品項明細',
+  '糖葫蘆數量',
+  '掃帚數量',
+  '糖葫蘆小計',
+  '掃帚租金',
+  '掃帚押金',
+  '運費',
+  '總金額',
+  'PDF 連結',
+  '備註',
+  '購物車 JSON',
+  'Firestore 建立時間',
+  '報表更新時間'
+];
+
+function upsertOrderReportRow(data, pdfDownloadUrl) {
+  const spreadsheet = getOrderReportSpreadsheet();
+  const sheet = ensureOrderReportSheet(spreadsheet);
+  const rowValues = buildOrderReportRow(data, pdfDownloadUrl);
+  const firestoreId = String(data.firestoreDocumentId || data.firestoreId || '').trim();
+  const orderNumber = String(data.orderNumber || '').trim();
+  const rows = sheet.getDataRange().getValues();
+  let targetRow = 0;
+
+  for (let i = 1; i < rows.length; i++) {
+    const rowFirestoreId = String(rows[i][2] || '').trim();
+    const rowOrderNumber = String(rows[i][3] || '').trim();
+    if ((firestoreId && rowFirestoreId === firestoreId) || (orderNumber && rowOrderNumber === orderNumber)) {
+      targetRow = i + 1;
+      break;
+    }
+  }
+
+  if (targetRow) {
+    sheet.getRange(targetRow, 1, 1, ORDER_REPORT_HEADERS.length).setValues([rowValues]);
+  } else {
+    sheet.appendRow(rowValues);
+    targetRow = sheet.getLastRow();
+  }
+
+  sheet.getRange(targetRow, 14, 1, 2).setNumberFormat('@');
+  sheet.getRange(targetRow, 17, 1, 1).setNumberFormat('@');
+  sheet.autoResizeColumns(1, ORDER_REPORT_HEADERS.length);
+
+  return {
+    synced: true,
+    spreadsheetUrl: spreadsheet.getUrl(),
+    rowNumber: targetRow
+  };
+}
+
+function getOrderReportSpreadsheet() {
+  const configuredId = typeof ORDER_REPORT_SPREADSHEET_ID !== 'undefined' ? String(ORDER_REPORT_SPREADSHEET_ID || '').trim() : '';
+  const props = PropertiesService.getScriptProperties();
+  let spreadsheetId = configuredId || props.getProperty('ORDER_REPORT_SPREADSHEET_ID') || '';
+
+  if (spreadsheetId) {
+    return SpreadsheetApp.openById(spreadsheetId);
+  }
+
+  const spreadsheet = SpreadsheetApp.create('李伯伯糖葫蘆訂單報表');
+  props.setProperty('ORDER_REPORT_SPREADSHEET_ID', spreadsheet.getId());
+
+  try {
+    const reportFile = DriveApp.getFileById(spreadsheet.getId());
+    const folder = DriveApp.getFolderById(PDF_FOLDER_ID);
+    folder.addFile(reportFile);
+    DriveApp.getRootFolder().removeFile(reportFile);
+  } catch (moveErr) {
+    Logger.log('Unable to move report spreadsheet into PDF folder: ' + moveErr.toString());
+  }
+
+  return spreadsheet;
+}
+
+function ensureOrderReportSheet(spreadsheet) {
+  const sheetName = typeof ORDER_REPORT_SHEET_NAME !== 'undefined' ? ORDER_REPORT_SHEET_NAME : '訂單報表';
+  let sheet = spreadsheet.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(sheetName);
+  }
+
+  const defaultSheet = spreadsheet.getSheetByName('工作表1') || spreadsheet.getSheetByName('Sheet1');
+  if (defaultSheet && defaultSheet.getSheetId() !== sheet.getSheetId() && defaultSheet.getLastRow() === 0) {
+    try {
+      spreadsheet.deleteSheet(defaultSheet);
+    } catch (deleteErr) {
+      Logger.log('Unable to delete empty default sheet: ' + deleteErr.toString());
+    }
+  }
+
+  if (sheet.getMaxColumns() < ORDER_REPORT_HEADERS.length) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), ORDER_REPORT_HEADERS.length - sheet.getMaxColumns());
+  }
+
+  sheet.getRange(1, 1, 1, ORDER_REPORT_HEADERS.length).setValues([ORDER_REPORT_HEADERS]);
+  sheet.getRange(1, 1, 1, ORDER_REPORT_HEADERS.length)
+    .setFontWeight('bold')
+    .setBackground('#FCE8E6')
+    .setFontColor('#5F2120');
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+function buildOrderReportRow(data, pdfDownloadUrl) {
+  const cart = data.cart || {};
+  const candyQty = getCartQuantity(cart, false);
+  const broomQty = getCartQuantity(cart, true);
+  const itemDetails = formatCartItemsForSheet(cart, data.itemsList);
+  const now = new Date();
+
+  return [
+    now,
+    '已同步',
+    data.firestoreDocumentId || data.firestoreId || '',
+    data.orderNumber || '',
+    data.orderDate || '',
+    data.orderTime || '',
+    data.eventDate || '',
+    data.eventTime || '',
+    data.eventType || '',
+    data.deliveryCity || '',
+    data.locationName || data.eventLocation || '',
+    data.specificDetails || '',
+    data.ordererName || '',
+    toPlainTextPhone(data.ordererPhone),
+    data.ordererEmail || '',
+    data.recipientName || '',
+    toPlainTextPhone(data.recipientPhone),
+    itemDetails,
+    candyQty,
+    broomQty,
+    Number(data.candyTotal) || 0,
+    Number(data.broomRent) || 0,
+    Number(data.broomDeposit) || 0,
+    Number(data.shippingFee) || 0,
+    Number(data.totalAmount) || 0,
+    pdfDownloadUrl || data.pdfDownloadUrl || '',
+    data.notes || '',
+    JSON.stringify(cart),
+    data.createdAt || '',
+    now
+  ];
+}
+
+function getCartQuantity(cart, broomOnly) {
+  let quantity = 0;
+  Object.keys(cart || {}).forEach(function(id) {
+    const isBroom = String(id) === '5';
+    if (broomOnly !== isBroom) return;
+    quantity += Number(cart[id]) || 0;
+  });
+  return quantity;
+}
+
+function formatCartItemsForSheet(cart, fallbackItemsList) {
+  const ids = Object.keys(cart || {}).sort(function(a, b) { return Number(a) - Number(b); });
+  if (!ids.length && fallbackItemsList) {
+    return String(fallbackItemsList);
+  }
+
+  return ids
+    .filter(function(id) { return Number(cart[id]) > 0; })
+    .map(function(id) {
+      const product = PRODUCTS[id] || { name: '商品 ' + id };
+      return product.name + ' x' + cart[id];
+    })
+    .join('\n');
+}
+
+function toPlainTextPhone(value) {
+  if (!value) return '';
+  return "'" + String(value).replace(/^'/, '');
 }
 
 // ==========================================
