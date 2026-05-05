@@ -1,5 +1,3 @@
-// Api.gs
-
 /**
  * ==========================================
  * 李伯伯糖葫蘆 - 微服務 API (Api.gs)
@@ -10,6 +8,21 @@
  * 2. 發送 LINE / Telegram / Email 通知。
  */
 
+// ==========================================
+// 🔐 全域環境變數設定
+// ==========================================
+const LINE_CHANNEL_ACCESS_TOKEN = 'Szz8gLG1ZeHuVW9DoTRtFf86tmxkfl4k0uGmD1xttmvdZIvQ800W/UDGJ23GeYjdHA/pCFm2oabZC/u3JQ+crvIMwwNHStr8ulYPPBtHwoKul2vFm97nUWvBkdmCqM1v8vxdCIcRbUGlBWkawcj9ZwdB04t89/1O/w1cDnyilFU=';
+const LINE_ADMIN_USER_ID = 'U4460cd7d1f421c42d6dbf0f07253580e';
+
+// 後台管理員的 LINE User ID (必須是陣列格式)
+const ADMIN_LINE_IDS = ['U4460cd7d1f421c42d6dbf0f07253580e'];
+
+// 備用通道登入密碼 (您可在此直接修改為您想要的密碼)
+const ADMIN_PASSWORD = 'leebobo_admin'; 
+
+// ==========================================
+// 🚀 核心 API 邏輯
+// ==========================================
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
@@ -99,7 +112,7 @@ function doPost(e) {
       const messageContent = `🍡【新訂單通知】\n編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日：${data.eventDate} ${data.eventTime}\n[PDF連結]：\n${directUrl}`;
       sendMerchantNotification(messageContent);
       
-      if (NOTIFY_EMAIL) {
+      if (typeof NOTIFY_EMAIL !== "undefined" && NOTIFY_EMAIL) {
         MailApp.sendEmail({
           to: NOTIFY_EMAIL, subject: `【系統通知】收到新訂單 - 編號 ${data.orderNumber}`,
           body: `您好，系統已收到一筆新訂單。\n\n訂單編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日期：${data.eventDate} ${data.eventTime}\n\n詳情明細請參閱附件 PDF。`,
