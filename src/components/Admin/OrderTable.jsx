@@ -1,6 +1,46 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { parseSpecificDetails } from '../../utils/orderDetails';
 
+const parseDateParts = (dateValue) => {
+  if (!dateValue) return null;
+  const match = String(dateValue).match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  return {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+  };
+};
+
+const parseTimeParts = (timeValue) => {
+  if (!timeValue) return { hour: 0, minute: 0, second: 0 };
+  const match = String(timeValue).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return { hour: 0, minute: 0, second: 0 };
+
+  return {
+    hour: Number(match[1]),
+    minute: Number(match[2]),
+    second: Number(match[3] || 0),
+  };
+};
+
+const getOrderTimestamp = (dateValue, timeValue, fallback = 0) => {
+  const dateParts = parseDateParts(dateValue);
+  if (!dateParts) return fallback;
+
+  const timeParts = parseTimeParts(timeValue);
+  return new Date(
+    dateParts.year,
+    dateParts.month - 1,
+    dateParts.day,
+    timeParts.hour,
+    timeParts.minute,
+    timeParts.second
+  ).getTime();
+};
+
 export default function OrderTable({ 
   searchTerm, 
   setSearchTerm, 
@@ -37,13 +77,11 @@ export default function OrderTable({
     statusItems.sort((a, b) => {
       let dateA, dateB;
       if (sortConfig.key === 'orderCreation') {
-        dateA = new Date(`${a.orderDate} ${a.orderTime || '00:00:00'}`).getTime();
-        dateB = new Date(`${b.orderDate} ${b.orderTime || '00:00:00'}`).getTime();
+        dateA = getOrderTimestamp(a.orderDate, a.orderTime);
+        dateB = getOrderTimestamp(b.orderDate, b.orderTime);
       } else if (sortConfig.key === 'eventDate') {
-        const safeDateA = a.eventDate ? a.eventDate.replace(/-/g, '/') : '1970/01/01';
-        const safeDateB = b.eventDate ? b.eventDate.replace(/-/g, '/') : '1970/01/01';
-        dateA = new Date(`${safeDateA} ${a.eventTime || '00:00'}`).getTime();
-        dateB = new Date(`${safeDateB} ${b.eventTime || '00:00'}`).getTime();
+        dateA = getOrderTimestamp(a.eventDate, a.eventTime);
+        dateB = getOrderTimestamp(b.eventDate, b.eventTime);
       }
       if (dateA < dateB) return sortConfig.direction === 'asc' ? -1 : 1;
       if (dateA > dateB) return sortConfig.direction === 'asc' ? 1 : -1;
