@@ -1,20 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 
 // 引入全站共用元件
 import Footer from './components/Footer';
 
 // 引入所有獨立頁面組件
-import BrandStory from './pages/BrandStory';
-import OrderProcess from './pages/OrderProcess';
-import ContactUs from './pages/ContactUs';
-import ProductList from './pages/ProductList';
-import Checkout from './pages/Checkout';
-import OrderSuccess from './pages/OrderSuccess';
-import OrderInquiry from './pages/OrderInquiry';
+const BrandStory = lazy(() => import('./pages/BrandStory'));
+const OrderProcess = lazy(() => import('./pages/OrderProcess'));
+const ContactUs = lazy(() => import('./pages/ContactUs'));
+const ProductList = lazy(() => import('./pages/ProductList'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const OrderSuccess = lazy(() => import('./pages/OrderSuccess'));
+const OrderInquiry = lazy(() => import('./pages/OrderInquiry'));
 
 // 引入後台管理的骨架頁面
-import AdminDashboard from './pages/AdminDashboard';
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+
+const PageLoader = () => (
+  <div className="min-h-[50vh] flex items-center justify-center text-amberRed font-bold text-xl">
+    載入中...
+  </div>
+);
 
 // --------------------------------------------------------
 // 💡 AppContent 是主要應用程式邏輯，被 BrowserRouter 包覆
@@ -133,9 +139,11 @@ function AppContent() {
   // ==========================================
   if (isAdminRoute) {
     return (
-      <Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
         <Route path="/admin/*" element={<AdminDashboard />} />
-      </Routes>
+        </Routes>
+      </Suspense>
     );
   }
 
@@ -233,7 +241,8 @@ function AppContent() {
 
       {/* 🚀 頁面路由器 */}
       <div className="pt-24 pb-10 min-h-[85vh]">
-        <Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
           <Route path="/" element={<BrandStory navigateTo={handleNavigate} />} />
           <Route path="/process" element={<OrderProcess navigateTo={handleNavigate} />} />
           <Route path="/contact" element={<ContactUs />} />
@@ -243,7 +252,8 @@ function AppContent() {
           <Route path="/success" element={<OrderSuccess submittedOrder={submittedOrder} navigateTo={handleNavigate} />} />
           <Route path="/inquiry" element={<OrderInquiry setAlertMsg={setAlertMsg} />} />
           <Route path="*" element={<BrandStory navigateTo={handleNavigate} />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </div>
 
       <Footer />

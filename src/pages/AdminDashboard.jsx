@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import liff from '@line/liff';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import DashboardStats from '../components/Admin/DashboardStats';
 import OrderTable from '../components/Admin/OrderTable';
@@ -42,7 +42,20 @@ const emptyEditModal = {
   notes: ''
 };
 
-export default function AdminDashboard() {
+const adminQueryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000,
+      gcTime: 5 * 60 * 1000,
+      retry: 1
+    },
+    mutations: {
+      retry: false
+    }
+  }
+});
+
+function AdminDashboardContent() {
   const queryClient = useQueryClient();
 
   const [authStatus, setAuthStatus] = useState('checking');
@@ -546,5 +559,13 @@ export default function AdminDashboard() {
       </button>
       {isMobileMenuOpen && <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)}></div>}
     </div>
+  );
+}
+
+export default function AdminDashboard() {
+  return (
+    <QueryClientProvider client={adminQueryClient}>
+      <AdminDashboardContent />
+    </QueryClientProvider>
   );
 }
