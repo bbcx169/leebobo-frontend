@@ -7,7 +7,7 @@ on:
     branches:
       - main
 
-# 💡 全域環境變數設定
+#  全域環境變數設定
 env:
   # 解決 Node.js 20 棄用警告，強制 Actions 運行在 Node 24 環境
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
