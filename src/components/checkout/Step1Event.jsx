@@ -10,8 +10,7 @@ const Step1Event = ({ formData, handleFormChange, getMinDate, currentTotalQty = 
     const selectedDate = e.target.value;
     const inputName = e.target.name; 
 
-    // 1. ✨【關鍵修正】：先立刻更新父元件的狀態，讓畫面上的日期馬上改變！
-    // 這裡我們手動建構一個假的 event 物件傳過去，避免原本的 e 物件失效
+    // 1. 先立刻更新父元件的狀態，讓畫面上的日期馬上改變！
     handleFormChange({ target: { name: inputName, value: selectedDate } });
 
     // 如果使用者是手動清空日期，直接結束，不用查資料庫
@@ -30,8 +29,14 @@ const Step1Event = ({ formData, handleFormChange, getMinDate, currentTotalQty = 
 
       querySnapshot.forEach((doc) => {
         const orderData = doc.data();
-        if (orderData.candyTotal) {
-          totalCandiesUsed += parseInt(orderData.candyTotal, 10);
+        
+        // ✨【關鍵修正】：從 cart 購物車裡面計算真實的「糖葫蘆數量」，不再讀取 candyTotal(金額)
+        if (orderData.cart) {
+          Object.entries(orderData.cart).forEach(([id, qty]) => {
+            if (parseInt(id) !== 5) { // 排除 ID 為 5 的承租掃帚
+              totalCandiesUsed += qty;
+            }
+          });
         }
       });
 
@@ -41,7 +46,7 @@ const Step1Event = ({ formData, handleFormChange, getMinDate, currentTotalQty = 
       if (remaining < currentTotalQty) {
         alert(`非常抱歉，為堅持手工新鮮製作的品質，我們每日產能上限為 800 支。\n\n您選擇的日期目前剩餘可訂購額度為 ${remaining} 支。\n\n請微調數量或選擇其他日期，感謝您的體諒！🍡`);
         
-        // 2. ✨【關鍵修正】：額度不足，強迫把剛剛寫入的日期清空
+        // 額度不足，強迫把剛剛寫入的日期清空
         handleFormChange({ target: { name: inputName, value: '' } });
       } else {
         console.log(`日期驗證成功！該日剩餘額度：${remaining} 支`); 
@@ -89,7 +94,6 @@ const Step1Event = ({ formData, handleFormChange, getMinDate, currentTotalQty = 
           name={formData.eventType === 'wedding' ? 'weddingDate' : 'generalDate'} 
           required 
           min={getMinDate()} 
-          // 修正綁定邏輯，精準對應 eventType 顯示的日期
           value={formData.eventType === 'wedding' ? (formData.weddingDate || '') : (formData.generalDate || '')} 
           onChange={handleDateValidation} 
           disabled={isChecking}
