@@ -215,7 +215,7 @@ const Checkout = ({
       setSubmitMsg("正在為您生成專屬 PDF 訂單明細與發送通知...");
 
       // ✨ 步驟 2：呼叫 GAS 微服務產 PDF 及通知
-      const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL;
+      const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec";
       const gasPayload = { ...payload, action: 'create_order' }; 
       
       const response = await fetch(SCRIPT_URL, { 
