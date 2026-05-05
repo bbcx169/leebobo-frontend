@@ -56,12 +56,31 @@ const sendGasRequest = async (payload) => {
 };
 
 const getOrderCreatedTime = (order) => {
-  if (order.createdAt) return Number(order.createdAt) || 0;
+  const createdAt = order.createdAt;
+  if (typeof createdAt === 'number') return createdAt;
+  if (createdAt instanceof Date) return createdAt.getTime();
+  if (createdAt?.toMillis) return createdAt.toMillis();
+  if (typeof createdAt?.seconds === 'number') return createdAt.seconds * 1000;
+  if (typeof createdAt?._seconds === 'number') return createdAt._seconds * 1000;
+  if (typeof createdAt === 'string') {
+    const numericCreatedAt = Number(createdAt);
+    if (!Number.isNaN(numericCreatedAt) && numericCreatedAt > 0) return numericCreatedAt;
+  }
 
-  const dateText = String(order.orderDate || '').replace(/\//g, '-');
-  const timeText = order.orderTime || '00:00:00';
-  const timestamp = new Date(`${dateText} ${timeText}`).getTime();
-  return Number.isNaN(timestamp) ? 0 : timestamp;
+  const dateParts = String(order.orderDate || '')
+    .split(/[/-]/)
+    .map(part => Number(part));
+  const timeParts = String(order.orderTime || '00:00:00')
+    .split(':')
+    .map(part => Number(part));
+
+  if (dateParts.length >= 3 && dateParts.every(part => !Number.isNaN(part))) {
+    const [year, month, day] = dateParts;
+    const [hour = 0, minute = 0, second = 0] = timeParts;
+    return new Date(year, month - 1, day, hour || 0, minute || 0, second || 0).getTime();
+  }
+
+  return 0;
 };
 
 const OrderInquiry = ({ setAlertMsg }) => {
