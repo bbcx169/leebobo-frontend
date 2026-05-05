@@ -354,7 +354,7 @@ export default function AdminDashboard() {
         </nav>
         <div className="p-3 border-t border-gray-100 space-y-2">
           <button 
-            onClick={() => window.location.href = '/'} 
+            onClick={() => window.location.href = '/leebobo-frontend/'} 
             className={`w-full py-3 flex items-center justify-center text-lg text-gray-600 font-bold hover:bg-gray-50 rounded-2xl transition-colors border border-transparent hover:border-gray-100 ${isSidebarExpanded ? 'px-4' : 'px-0'}`}
             title="返回前台首頁"
           >

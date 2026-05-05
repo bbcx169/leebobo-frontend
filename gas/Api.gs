@@ -9,18 +9,6 @@
  */
 
 // ==========================================
-// 🔐 全域環境變數設定
-// ==========================================
-const LINE_CHANNEL_ACCESS_TOKEN = 'Szz8gLG1ZeHuVW9DoTRtFf86tmxkfl4k0uGmD1xttmvdZIvQ800W/UDGJ23GeYjdHA/pCFm2oabZC/u3JQ+crvIMwwNHStr8ulYPPBtHwoKul2vFm97nUWvBkdmCqM1v8vxdCIcRbUGlBWkawcj9ZwdB04t89/1O/w1cDnyilFU=';
-const LINE_ADMIN_USER_ID = 'U4460cd7d1f421c42d6dbf0f07253580e';
-
-// 後台管理員的 LINE User ID (必須是陣列格式)
-const ADMIN_LINE_IDS = ['U4460cd7d1f421c42d6dbf0f07253580e'];
-
-// 備用通道登入密碼 (您可在此直接修改為您想要的密碼)
-const ADMIN_PASSWORD = 'leebobo_admin'; 
-
-// ==========================================
 // 🚀 核心 API 邏輯
 // ==========================================
 function doPost(e) {
