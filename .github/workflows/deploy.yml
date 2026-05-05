@@ -1,4 +1,4 @@
-# 🚀 李伯伯電商系統 - GitHub Pages 自動化部署流程 (2026 優化版)
+# 李伯伯電商系統 - GitHub Pages 自動化部署流程 (2026 優化版)
 name: Deploy to GitHub Pages
 
 on:
