@@ -241,7 +241,12 @@ export default function AdminDashboard() {
     if (!resendModal.email) return alert("請輸入 Email");
     setIsResending(true);
     try {
-      await callGasApi({ action: 'resendPdf', orderNumber: resendModal.order.orderNumber, email: resendModal.email });
+      await callGasApi({
+        action: 'resendPdf',
+        orderNumber: resendModal.order.orderNumber,
+        pdfDownloadUrl: resendModal.order.pdfDownloadUrl,
+        email: resendModal.email
+      });
       setAlertMsg(`✅ 已補發至 ${resendModal.email}`);
       setResendModal({ isOpen: false, order: null, email: '' });
     } catch (err) {

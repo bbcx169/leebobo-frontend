@@ -32,21 +32,28 @@ function doPost(e) {
     // 3. 補發 PDF 至 Email
     if (data.action === 'admin_resend_pdf' || data.action === 'resendPdf') {
       try {
-        const folder = DriveApp.getFolderById(PDF_FOLDER_ID);
-        const fileName = `李伯伯糖葫蘆_訂單明細_${data.orderNumber}.pdf`;
-        const files = folder.searchFiles(`title = '${fileName}'`);
-        if (!files.hasNext()) {
-          return ContentService.createTextOutput(JSON.stringify({ 'status': 'error', 'message': '找不到該筆訂單的 PDF 檔案。' })).setMimeType(ContentService.MimeType.JSON);
+        if (!data.email) {
+          return jsonResponse({ status: 'error', message: '缺少收件人 Email。' });
+        }
+        if (!data.orderNumber) {
+          return jsonResponse({ status: 'error', message: '缺少訂單編號。' });
         }
         
-        const file = files.next();
-        const blob = file.getBlob();
+        const file = findOrderPdfFile(data);
+        if (!file) {
+          return jsonResponse({
+            status: 'error',
+            message: `找不到訂單 ${data.orderNumber} 的 PDF 檔案，請先重新產生 PDF 後再補發。`
+          });
+        }
+
+        const blob = file.getBlob().setName(`李伯伯糖葫蘆_訂單明細_${data.orderNumber}.pdf`);
         const customerMsg = `親愛的顧客您好：\n\n這是「李伯伯糖葫蘆」補發的訂單明細。\n訂單編號：${data.orderNumber}\n\n附件為您的訂單 PDF 檔，請查收。\n\n李伯伯糖葫蘆 敬上`;
         MailApp.sendEmail({ to: data.email, subject: `【明細補發】李伯伯糖葫蘆 - 訂單編號 ${data.orderNumber}`, body: customerMsg, attachments: [blob] });
         
-        return ContentService.createTextOutput(JSON.stringify({ 'status': 'success' })).setMimeType(ContentService.MimeType.JSON);
+        return jsonResponse({ status: 'success' });
       } catch (err) { 
-        return ContentService.createTextOutput(JSON.stringify({ 'status': 'error', 'message': err.toString() })).setMimeType(ContentService.MimeType.JSON);
+        return jsonResponse({ status: 'error', message: err.toString() });
       }
     }
 
@@ -306,6 +313,55 @@ function doGet(e) {
     }
   }
   return ContentService.createTextOutput("API 正常運作中！");
+}
+
+function jsonResponse(payload) {
+  return ContentService
+    .createTextOutput(JSON.stringify(payload))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function findOrderPdfFile(data) {
+  const url = data.pdfDownloadUrl || data.pdfUrl || "";
+  const fileId = extractDriveFileId(url);
+  if (fileId) {
+    try {
+      return DriveApp.getFileById(fileId);
+    } catch (err) {
+      Logger.log("PDF lookup by URL failed for " + fileId + ": " + err.toString());
+    }
+  }
+
+  const folder = DriveApp.getFolderById(PDF_FOLDER_ID);
+  const exactFileName = `李伯伯糖葫蘆_訂單明細_${data.orderNumber}.pdf`;
+  const exactFiles = folder.searchFiles(`title = '${escapeDriveQueryValue(exactFileName)}'`);
+  if (exactFiles.hasNext()) {
+    return exactFiles.next();
+  }
+
+  const orderNumber = String(data.orderNumber || "").trim();
+  if (!orderNumber) {
+    return null;
+  }
+
+  const fuzzyFiles = folder.searchFiles(`title contains '${escapeDriveQueryValue(orderNumber)}' and mimeType = 'application/pdf'`);
+  return fuzzyFiles.hasNext() ? fuzzyFiles.next() : null;
+}
+
+function extractDriveFileId(url) {
+  if (!url) return "";
+  const text = String(url);
+  const ucMatch = text.match(/[?&]id=([^&]+)/);
+  if (ucMatch) return decodeURIComponent(ucMatch[1]);
+
+  const fileMatch = text.match(/\/file\/d\/([^/]+)/);
+  if (fileMatch) return decodeURIComponent(fileMatch[1]);
+
+  return "";
+}
+
+function escapeDriveQueryValue(value) {
+  return String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
 // ==========================================

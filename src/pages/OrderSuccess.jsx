@@ -25,6 +25,32 @@ const parseGasResponse = async (response) => {
   }
 };
 
+const sendGasRequest = async (payload) => {
+  try {
+    const response = await fetch(GAS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+
+    return await parseGasResponse(response);
+  } catch (error) {
+    console.warn("Readable GAS request failed, retrying as no-cors:", error);
+
+    await fetch(GAS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+
+    return {
+      status: 'success',
+      message: '補發請求已送出，請稍後確認信箱。'
+    };
+  }
+};
+
 const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
   const [isPdfDownloaded, setIsPdfDownloaded] = useState(false);
   
@@ -78,17 +104,13 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
         throw new Error("PDF has not been generated yet. Please contact the shop to resend the order details.");
       }
       
-      const response = await fetch(GAS_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({
-          action: 'resendPdf',
-          orderNumber: submittedOrder.orderNumber,
-          email: emailAddress
-        })
+      const result = await sendGasRequest({
+        action: 'resendPdf',
+        orderNumber: submittedOrder.orderNumber,
+        pdfDownloadUrl: submittedOrder.pdfDownloadUrl,
+        email: emailAddress
       });
-      
-      const result = await parseGasResponse(response);
+
       if (result.status === 'success') {
         setEmailStatus('success');
         // 成功後 3 秒自動收合輸入框

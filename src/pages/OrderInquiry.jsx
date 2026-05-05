@@ -100,6 +100,7 @@ const OrderInquiry = ({ setAlertMsg }) => {
               body: JSON.stringify({ 
                   action: 'resendPdf', 
                   orderNumber: inqData.orderNumber, 
+                  pdfDownloadUrl: inqData.pdfDownloadUrl,
                   email: resendEmail 
               })
           });
