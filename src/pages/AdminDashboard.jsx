@@ -272,10 +272,16 @@ export default function AdminDashboard() {
 
     setIsDeleting(true);
     try {
+      await callGasApi({
+        action: 'mark_order_deleted',
+        firestoreDocumentId: targetOrder.id,
+        orderNumber: targetOrder.orderNumber
+      });
+
       await deleteDoc(doc(db, "orders", targetOrder.id));
       setOrders(prev => prev.filter(order => order.id !== targetOrder.id));
       setDeleteModal({ isOpen: false, order: null, confirmText: '' });
-      setAlertMsg(`✅ 訂單 #${targetOrder.orderNumber} 已從 Firebase Firestore 刪除。`);
+      setAlertMsg(`✅ 訂單 #${targetOrder.orderNumber} 已刪除，Google Sheets 報表已標記為「已刪除」。`);
     } catch (err) {
       console.error("刪除訂單失敗:", err);
       setAlertMsg("❌ 刪除失敗：" + err.message);

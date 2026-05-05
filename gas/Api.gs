@@ -119,7 +119,25 @@ function doPost(e) {
       }
     }
 
-    // 4. 處理新訂單 (更新顧客收執信件內容)
+    // 4. 將 Google Sheets 訂單報表中的訂單標記為已刪除
+    if (data.action === 'mark_order_deleted') {
+      const deleteLock = LockService.getScriptLock();
+      try {
+        deleteLock.waitLock(10000);
+        const result = markOrderReportRowDeleted(data);
+        return jsonResponse({ status: 'success', ...result });
+      } catch (err) {
+        return jsonResponse({ status: 'error', message: err.toString() });
+      } finally {
+        try {
+          deleteLock.releaseLock();
+        } catch (lockErr) {
+          Logger.log("Unable to release delete lock: " + lockErr.toString());
+        }
+      }
+    }
+
+    // 5. 處理新訂單 (更新顧客收執信件內容)
     if (data.action === 'create_order') {
       const orderLock = LockService.getScriptLock();
       try {
@@ -285,19 +303,7 @@ function upsertOrderReportRow(data, pdfDownloadUrl) {
   const spreadsheet = getOrderReportSpreadsheet();
   const sheet = ensureOrderReportSheet(spreadsheet);
   const rowValues = buildOrderReportRow(data, pdfDownloadUrl);
-  const firestoreId = String(data.firestoreDocumentId || data.firestoreId || '').trim();
-  const orderNumber = String(data.orderNumber || '').trim();
-  const rows = sheet.getDataRange().getValues();
-  let targetRow = 0;
-
-  for (let i = 1; i < rows.length; i++) {
-    const rowFirestoreId = String(rows[i][2] || '').trim();
-    const rowOrderNumber = String(rows[i][3] || '').trim();
-    if ((firestoreId && rowFirestoreId === firestoreId) || (orderNumber && rowOrderNumber === orderNumber)) {
-      targetRow = i + 1;
-      break;
-    }
-  }
+  let targetRow = findOrderReportRow(sheet, data);
 
   if (targetRow) {
     sheet.getRange(targetRow, 1, 1, ORDER_REPORT_HEADERS.length).setValues([rowValues]);
@@ -315,6 +321,65 @@ function upsertOrderReportRow(data, pdfDownloadUrl) {
     spreadsheetUrl: spreadsheet.getUrl(),
     rowNumber: targetRow
   };
+}
+
+function markOrderReportRowDeleted(data) {
+  const spreadsheet = getOrderReportSpreadsheet();
+  const sheet = ensureOrderReportSheet(spreadsheet);
+  const targetRow = findOrderReportRow(sheet, data);
+
+  if (!targetRow) {
+    throw new Error(`找不到可標記刪除的報表列：${data.orderNumber || data.firestoreDocumentId || data.firestoreId || '未提供識別碼'}`);
+  }
+
+  const now = new Date();
+  const statusColumn = ORDER_REPORT_HEADERS.indexOf('同步狀態') + 1;
+  const updatedAtColumn = ORDER_REPORT_HEADERS.indexOf('報表更新時間') + 1;
+  const notesColumn = ORDER_REPORT_HEADERS.indexOf('備註') + 1;
+  const numericColumns = [
+    '糖葫蘆數量',
+    '掃帚數量',
+    '糖葫蘆小計',
+    '掃帚租金',
+    '掃帚押金',
+    '運費',
+    '總金額'
+  ].map(function(header) { return ORDER_REPORT_HEADERS.indexOf(header) + 1; });
+
+  const existingNotes = String(sheet.getRange(targetRow, notesColumn).getValue() || '');
+  const deleteNote = `刪除時間：${Utilities.formatDate(now, 'Asia/Taipei', 'yyyy/MM/dd HH:mm:ss')}`;
+
+  sheet.getRange(targetRow, statusColumn).setValue('已刪除');
+  sheet.getRange(targetRow, updatedAtColumn).setValue(now);
+  sheet.getRange(targetRow, notesColumn).setValue(existingNotes ? `${existingNotes}\n${deleteNote}` : deleteNote);
+  numericColumns.forEach(function(column) {
+    sheet.getRange(targetRow, column).setValue(0);
+  });
+  sheet.getRange(targetRow, 1, 1, ORDER_REPORT_HEADERS.length)
+    .setBackground('#F3F4F6')
+    .setFontColor('#6B7280');
+
+  return {
+    sheetDeleted: true,
+    spreadsheetUrl: spreadsheet.getUrl(),
+    rowNumber: targetRow
+  };
+}
+
+function findOrderReportRow(sheet, data) {
+  const firestoreId = String(data.firestoreDocumentId || data.firestoreId || '').trim();
+  const orderNumber = String(data.orderNumber || '').trim();
+  const rows = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < rows.length; i++) {
+    const rowFirestoreId = String(rows[i][2] || '').trim();
+    const rowOrderNumber = String(rows[i][3] || '').trim();
+    if ((firestoreId && rowFirestoreId === firestoreId) || (orderNumber && rowOrderNumber === orderNumber)) {
+      return i + 1;
+    }
+  }
+
+  return 0;
 }
 
 function getOrderReportSpreadsheet() {
