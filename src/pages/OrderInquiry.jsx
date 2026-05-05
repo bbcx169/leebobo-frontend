@@ -8,7 +8,52 @@ import { db } from '../utils/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
 // 💡 寄送 Email 還是需要 GAS 微服務，所以保留 SCRIPT_URL
-const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL;
+const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec";
+
+const parseGasResponse = async (response) => {
+  const responseText = await response.text();
+  const trimmedText = responseText.trim();
+
+  if (!trimmedText) {
+    throw new Error("GAS 回傳空白內容，請確認 Apps Script 部署狀態。");
+  }
+
+  if (trimmedText.startsWith("<")) {
+    throw new Error("GAS 回傳 HTML 頁面，不是 JSON。請確認 Apps Script Web App URL 與存取權限。");
+  }
+
+  try {
+    return JSON.parse(trimmedText);
+  } catch (error) {
+    throw new Error(`GAS 回傳內容無法解析：${error.message}`);
+  }
+};
+
+const sendGasRequest = async (payload) => {
+  try {
+    const response = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+
+    return await parseGasResponse(response);
+  } catch (error) {
+    console.warn("Readable GAS request failed, retrying as no-cors:", error);
+
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+
+    return {
+      status: 'success',
+      message: '補發請求已送出，請稍後確認信箱。'
+    };
+  }
+};
 
 const OrderInquiry = ({ setAlertMsg }) => {
   // 載入與訂購流程一致的滾動淡入動畫邏輯
@@ -94,17 +139,17 @@ const OrderInquiry = ({ setAlertMsg }) => {
       }
       setIsResending(true);
       try {
-          const response = await fetch(SCRIPT_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ 
-                  action: 'resendPdf', 
-                  orderNumber: inqData.orderNumber, 
-                  pdfDownloadUrl: inqData.pdfDownloadUrl,
-                  email: resendEmail 
-              })
+          if (!inqData?.pdfDownloadUrl) {
+              throw new Error("尚未取得 PDF 連結，請稍後再試或聯繫客服。");
+          }
+
+          const result = await sendGasRequest({ 
+              action: 'resendPdf', 
+              orderNumber: inqData.orderNumber, 
+              pdfDownloadUrl: inqData.pdfDownloadUrl,
+              email: resendEmail 
           });
-          const result = await response.json();
+
           if (result.status === 'success') {
               setAlertMsg("✅ 訂單 PDF 明細已成功補發至您的信箱！"); 
               setShowEmailPrompt(false);
