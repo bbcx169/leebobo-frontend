@@ -3,7 +3,7 @@ import liff from '@line/liff';
 
 // 🚀 引入 Firebase 相關方法
 import { db } from '../utils/firebase';
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, limit as firestoreLimit, startAfter, where } from 'firebase/firestore';
 
 // 🚀 引入展示元件
 import DashboardStats from '../components/Admin/DashboardStats';
@@ -16,6 +16,7 @@ import RevenueReport from '../components/Admin/RevenueReport';
 // ==========================================
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec';
 const LIFF_ID = '2009807397-WPVPBokl';
+const ORDER_PAGE_SIZE = 50;
 
 const productMapping = {
   1: "蕃茄 (小/喜糖)", 2: "蕃茄蜜餞 (小/喜糖)", 3: "鳥梨 (小/喜糖)", 4: "蕃茄+鳥梨 (小/喜糖)",
@@ -33,9 +34,15 @@ export default function AdminDashboard() {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [lastOrderDoc, setLastOrderDoc] = useState(null);
+  const [hasMoreOrders, setHasMoreOrders] = useState(true);
+  const [isLoadingMoreOrders, setIsLoadingMoreOrders] = useState(false);
   
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearchingOrders, setIsSearchingOrders] = useState(false);
+  const [searchMode, setSearchMode] = useState('none');
   
   const [settings, setSettings] = useState({ reminderEnabled: true, reminderTime: '11:00' });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -105,11 +112,22 @@ export default function AdminDashboard() {
     initializeLiff();
   }, []);
 
-  const fetchOrders = async () => {
-    setIsLoading(true);
+  const fetchOrders = async ({ reset = true } = {}) => {
+    if (!reset && (!hasMoreOrders || isLoadingMoreOrders || !lastOrderDoc)) return;
+
+    if (reset) {
+      setIsLoading(true);
+      setLastOrderDoc(null);
+      setHasMoreOrders(true);
+    } else {
+      setIsLoadingMoreOrders(true);
+    }
+
     try {
       const ordersRef = collection(db, "orders");
-      const q = query(ordersRef, orderBy("createdAt", "desc"));
+      const q = reset
+        ? query(ordersRef, orderBy("createdAt", "desc"), firestoreLimit(ORDER_PAGE_SIZE))
+        : query(ordersRef, orderBy("createdAt", "desc"), startAfter(lastOrderDoc), firestoreLimit(ORDER_PAGE_SIZE));
       const querySnapshot = await getDocs(q);
       
       const ordersData = [];
@@ -117,12 +135,18 @@ export default function AdminDashboard() {
         ordersData.push({ id: doc.id, ...doc.data() });
       });
       
-      setOrders(ordersData);
+      setOrders(prev => reset ? ordersData : [...prev, ...ordersData]);
+      setLastOrderDoc(querySnapshot.docs[querySnapshot.docs.length - 1] || null);
+      setHasMoreOrders(querySnapshot.size === ORDER_PAGE_SIZE);
     } catch (err) {
       console.error("Firebase 獲取訂單失敗:", err);
       setAlertMsg("無法取得訂單資料，請檢查網路連線");
     } finally {
-      setIsLoading(false);
+      if (reset) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMoreOrders(false);
+      }
     }
   };
 
@@ -132,6 +156,71 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (data.status === 'success') setSettings(data.data);
     } catch (err) {}
+  };
+
+  useEffect(() => {
+    if (authStatus !== 'logged_in') return;
+
+    const rawKeyword = searchTerm.trim();
+    if (!rawKeyword) {
+      setSearchResults([]);
+      setSearchMode('none');
+      setIsSearchingOrders(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      searchOrders(rawKeyword);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, authStatus]);
+
+  const searchOrders = async (rawKeyword) => {
+    const ordersRef = collection(db, "orders");
+    const digitsOnly = rawKeyword.replace(/\D/g, '');
+    const isPhoneSearch = digitsOnly.length === 10 && digitsOnly.startsWith('09');
+    const isOrderNumberSearch = /^[a-zA-Z0-9]{4,20}$/.test(rawKeyword);
+
+    if (!isPhoneSearch && !isOrderNumberSearch) {
+      setSearchResults([]);
+      setSearchMode('unsupported');
+      setIsSearchingOrders(false);
+      return;
+    }
+
+    setIsSearchingOrders(true);
+    setSearchMode(isPhoneSearch ? 'phone' : 'orderNumber');
+
+    try {
+      const searchQueries = [];
+
+      if (isPhoneSearch) {
+        searchQueries.push(query(ordersRef, where("ordererPhone", "==", digitsOnly), firestoreLimit(25)));
+        searchQueries.push(query(ordersRef, where("recipientPhone", "==", digitsOnly), firestoreLimit(25)));
+      } else {
+        const normalizedOrderNumber = rawKeyword.toUpperCase();
+        searchQueries.push(query(ordersRef, where("orderNumber", "==", normalizedOrderNumber), firestoreLimit(10)));
+        if (normalizedOrderNumber !== rawKeyword) {
+          searchQueries.push(query(ordersRef, where("orderNumber", "==", rawKeyword), firestoreLimit(10)));
+        }
+      }
+
+      const snapshots = await Promise.all(searchQueries.map(searchQuery => getDocs(searchQuery)));
+      const resultMap = new Map();
+      snapshots.forEach(snapshot => {
+        snapshot.forEach(orderDoc => {
+          resultMap.set(orderDoc.id, { id: orderDoc.id, ...orderDoc.data() });
+        });
+      });
+
+      setSearchResults(Array.from(resultMap.values()));
+    } catch (err) {
+      console.error("Firebase 搜尋訂單失敗:", err);
+      setAlertMsg("搜尋失敗，請檢查網路連線或稍後再試。");
+    } finally {
+      setIsSearchingOrders(false);
+    }
   };
 
   const handleLogin = () => liff.login({ redirectUri: window.location.href });
@@ -183,15 +272,7 @@ export default function AdminDashboard() {
     return { dailyOrders: dOrders, dailyMaterials: { items: materials, totalCandies } };
   }, [orders, selectedDate]);
 
-  const filteredOrders = useMemo(() => {
-    if (!searchTerm) return orders;
-    const t = searchTerm.toLowerCase();
-    return orders.filter(o => 
-      o.orderNumber?.toLowerCase().includes(t) || 
-      o.ordererName?.toLowerCase().includes(t) || 
-      o.ordererPhone?.includes(t)
-    );
-  }, [orders, searchTerm]);
+  const displayedOrders = searchTerm.trim() ? searchResults : orders;
 
   // ==========================================
   // 4. 業務事件處理
@@ -280,6 +361,7 @@ export default function AdminDashboard() {
 
       await deleteDoc(doc(db, "orders", targetOrder.id));
       setOrders(prev => prev.filter(order => order.id !== targetOrder.id));
+      setSearchResults(prev => prev.filter(order => order.id !== targetOrder.id));
       setDeleteModal({ isOpen: false, order: null, confirmText: '' });
       setAlertMsg(`✅ 訂單 #${targetOrder.orderNumber} 已刪除，Google Sheets 報表已標記為「已刪除」。`);
     } catch (err) {
@@ -424,7 +506,7 @@ export default function AdminDashboard() {
           <OrderTable 
             searchTerm={searchTerm} 
             setSearchTerm={setSearchTerm} 
-            filteredOrders={filteredOrders}
+            filteredOrders={displayedOrders}
             onEditClick={(o) => setEditModal({ 
               isOpen: true, 
               order: o, 
@@ -435,6 +517,14 @@ export default function AdminDashboard() {
             })}
             onResendClick={(o) => setResendModal({ isOpen: true, order: o, email: o.ordererEmail || '' })}
             onDeleteClick={(o) => setDeleteModal({ isOpen: true, order: o, confirmText: '' })}
+            loadedCount={orders.length}
+            pageSize={ORDER_PAGE_SIZE}
+            hasMoreOrders={hasMoreOrders}
+            isLoadingMoreOrders={isLoadingMoreOrders}
+            onLoadMore={() => fetchOrders({ reset: false })}
+            isSearchMode={Boolean(searchTerm.trim())}
+            searchMode={searchMode}
+            isSearchingOrders={isSearchingOrders}
           />
         )}
         {activeTab === 'revenue' && (

@@ -47,7 +47,15 @@ export default function OrderTable({
   filteredOrders, 
   onEditClick, 
   onResendClick,
-  onDeleteClick
+  onDeleteClick,
+  loadedCount = 0,
+  pageSize = 50,
+  hasMoreOrders = false,
+  isLoadingMoreOrders = false,
+  onLoadMore,
+  isSearchMode = false,
+  searchMode = 'none',
+  isSearchingOrders = false
 }) {
   // 🚀 1. 新增狀態過濾：預設為 'pending' (未完成)
   const [statusFilter, setStatusFilter] = useState('pending'); // 'pending' | 'completed' | 'all'
@@ -103,6 +111,19 @@ export default function OrderTable({
     return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
   };
 
+  const searchHint = useMemo(() => {
+    if (!isSearchMode) {
+      return `已載入 ${loadedCount} 筆，每次最多讀取 ${pageSize} 筆`;
+    }
+    if (isSearchingOrders) {
+      return '正在以訂單編號或手機號碼查詢 Firebase...';
+    }
+    if (searchMode === 'unsupported') {
+      return '搜尋只支援完整訂單編號或 10 碼手機號碼，不支援姓名搜尋';
+    }
+    return `已以${searchMode === 'phone' ? '手機號碼' : '訂單編號'}查詢 Firebase，共 ${filteredOrders.length} 筆結果`;
+  }, [filteredOrders.length, isSearchMode, isSearchingOrders, loadedCount, pageSize, searchMode]);
+
   // 滑鼠拖曳滾動邏輯
   const scrollRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -129,12 +150,12 @@ export default function OrderTable({
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <h2 className="text-4xl font-bold text-gray-800 font-serif">訂單總覽</h2>
-          <p className="text-gray-500 mt-2 text-lg">篩選狀態與排序，搜尋支援姓名、電話與編號</p>
+          <p className="text-gray-500 mt-2 text-lg">{searchHint}</p>
         </div>
         <div className="relative w-full md:w-80">
           <input 
             type="text" 
-            placeholder="搜尋姓名、電話、編號..." 
+            placeholder="輸入訂單編號或手機號碼" 
             value={searchTerm} 
             onChange={e => setSearchTerm(e.target.value)} 
             className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-full focus:ring-2 focus:ring-amberRed outline-none text-base shadow-sm" 
@@ -192,8 +213,10 @@ export default function OrderTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {finalDisplayOrders.length === 0 ? (
-                <tr><td colSpan="6" className="px-4 py-16 text-center text-gray-400 text-lg">目前沒有此分類的訂單紀錄</td></tr>
+              {isSearchingOrders ? (
+                <tr><td colSpan="6" className="px-4 py-16 text-center text-gray-400 text-lg">搜尋中...</td></tr>
+              ) : finalDisplayOrders.length === 0 ? (
+                <tr><td colSpan="6" className="px-4 py-16 text-center text-gray-400 text-lg">{isSearchMode ? '沒有符合的訂單' : '目前沒有此分類的訂單紀錄'}</td></tr>
               ) : (
                 finalDisplayOrders.map(order => {
                   const isPickup = order.deliveryCity === '自取';
@@ -274,6 +297,23 @@ export default function OrderTable({
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-3">
+        {isSearchMode ? (
+          <p className="text-sm text-gray-400 font-medium">搜尋模式會直接查 Firebase；清空搜尋欄可回到分頁列表</p>
+        ) : hasMoreOrders ? (
+          <button
+            type="button"
+            onClick={onLoadMore}
+            disabled={isLoadingMoreOrders}
+            className="px-8 py-3 bg-white text-gray-700 hover:text-amberRed rounded-full text-sm font-bold border border-gray-200 shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoadingMoreOrders ? '載入中...' : `載入更多訂單（每次 ${pageSize} 筆）`}
+          </button>
+        ) : (
+          <p className="text-sm text-gray-400 font-medium">已載入目前可取得的全部訂單</p>
+        )}
       </div>
     </div>
   );
