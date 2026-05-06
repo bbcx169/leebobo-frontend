@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    /*
+     * Transitional production rules.
+     *
+     * Current application constraints:
+     * - Frontend checkout creates orders directly from the browser.
+     * - Order inquiry reads orders by ordererPhone and can update pdfDownloadUrl.
+     * - AdminDashboard reads, updates, and deletes orders directly from the browser.
+     * - Product availability is read by the frontend and written by AdminDashboard.
+     *
+     * Because the app does not currently use Firebase Auth or server-side Admin SDK
+     * for these operations, these rules intentionally preserve the existing access
+     * model. This prevents a production-mode rules deploy from breaking checkout
+     * and admin workflows, but it is not the final security posture.
+     *
+     * Next hardening step:
+     * Move privileged writes/deletes to GAS or Cloud Functions, or introduce
+     * Firebase Auth + custom claims for admin users, then restrict these rules.
+     */
+
+    function isStringField(fieldName) {
+      return request.resource.data[fieldName] is string;
+    }
+
+    function isNumberField(fieldName) {
+      return request.resource.data[fieldName] is number;
+    }
+
+    function isValidOrderCreate() {
+      return request.resource.data.keys().hasAll([
+          'orderNumber',
+          'ordererName',
+          'ordererPhone',
+          'eventDate',
+          'cart',
+          'createdAt'
+        ])
+        && isStringField('orderNumber')
+        && isStringField('ordererName')
+        && isStringField('ordererPhone')
+        && isStringField('eventDate')
+        && request.resource.data.cart is map
+        && isNumberField('createdAt');
+    }
+
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create: if isValidOrderCreate();
+
+      // Transitional: required for current admin edit/delete and PDF URL updates.
+      allow update, delete: if true;
+    }
+
+    match /settings/productAvailability {
+      allow read: if true;
+
+      // Transitional: AdminDashboard currently writes this directly from frontend.
+      allow write: if true;
+    }
+
+    match /settings/{document=**} {
+      allow read: if true;
+
+      // No other settings documents are currently required from the frontend.
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

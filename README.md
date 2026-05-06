@@ -124,6 +124,15 @@ base: '/leebobo-frontend/'
 src/utils/firebase.js
 ```
 
+Firebase CLI 設定檔：
+
+```text
+.firebaserc
+firebase.json
+firestore.rules
+firestore.indexes.json
+```
+
 使用的主要 Firestore 資料：
 
 - `orders`：訂單資料
@@ -134,6 +143,30 @@ src/utils/firebase.js
 - `useInfiniteQuery(['adminOrders'])`：訂單分頁，每頁 50 筆
 - `useQuery(['adminOrderSearch', searchMode, keyword])`：訂單編號 / 手機查詢
 - `useMutation`：修改訂單、補發 PDF、刪除訂單、儲存設定
+
+### Firestore Rules 遷移狀態
+
+目前已新增 `firestore.rules`，但規則屬於「過渡正式版」：
+
+- 保留前台直接建立訂單
+- 保留訂單查詢直接讀取訂單
+- 保留後台直接更新 / 刪除訂單
+- 保留後台直接寫入商品上下架設定
+
+原因是目前專案尚未導入 Firebase Auth，也尚未將敏感操作全部移到 GAS / Cloud Functions。若現在直接關閉未授權讀寫，前台結帳與後台管理會中斷。
+
+部署 Firestore rules：
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+後續安全收斂方向：
+
+1. 前台建立訂單改由 GAS 或 Cloud Functions 代寫 Firestore
+2. 後台修改 / 刪除訂單改由具權限的 server-side API 處理
+3. 或導入 Firebase Auth + custom claims 辨識管理員
+4. 最後將 `orders` 的公開讀寫權限收緊
 
 ## Google Apps Script
 
@@ -255,6 +288,7 @@ npm run build
 
 - `vite.config.js` 的 `base` 是否符合部署路徑
 - Firebase 專案設定是否正確
+- Firestore rules 是否已部署到正確 Firebase project
 - GAS Web App URL 是否為最新部署版本
 - Apps Script 權限是否允許 Web App 執行
 - Google Sheets 報表 ID 是否正確
