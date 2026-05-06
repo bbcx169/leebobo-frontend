@@ -217,7 +217,10 @@ function AdminDashboardContent() {
   const deleteOrderMutation = useMutation({
     mutationFn: deleteAdminOrder,
     onSuccess: (result) => {
-      setAlertMsg(`訂單 #${result.orderNumber} 已刪除，Google Sheets 報表已同步標記為刪除。`);
+      const sheetMessage = result.rowNotFound
+        ? 'Google Sheets 找不到對應報表列，已略過報表標記。'
+        : 'Google Sheets 報表已同步標記為刪除。';
+      setAlertMsg(`訂單 #${result.orderNumber} 已刪除。${sheetMessage}`);
       setDeleteModal({ isOpen: false, order: null, confirmText: '' });
       invalidateAdminOrderQueries();
     },

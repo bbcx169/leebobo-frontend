@@ -379,7 +379,13 @@ function markOrderReportRowDeleted(data) {
   const targetRow = findOrderReportRow(sheet, data);
 
   if (!targetRow) {
-    throw new Error(`找不到可標記刪除的報表列：${data.orderNumber || data.firestoreDocumentId || data.firestoreId || '未提供識別碼'}`);
+    Logger.log(`Order report row not found while deleting: ${data.orderNumber || data.firestoreDocumentId || data.firestoreId || 'unknown'}`);
+    return {
+      sheetDeleted: false,
+      rowNotFound: true,
+      spreadsheetUrl: spreadsheet.getUrl(),
+      rowNumber: 0
+    };
   }
 
   const now = new Date();

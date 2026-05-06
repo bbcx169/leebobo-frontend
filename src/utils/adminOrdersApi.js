@@ -136,14 +136,19 @@ export const resendAdminOrderPdf = async ({ order, email }) => {
 };
 
 export const deleteAdminOrder = async ({ order }) => {
-  await callGasApi({
+  const gasResult = await callGasApi({
     action: 'mark_order_deleted',
     firestoreDocumentId: order.id,
     orderNumber: order.orderNumber
   });
 
   await deleteDoc(doc(db, 'orders', order.id));
-  return { orderNumber: order.orderNumber };
+  return {
+    orderNumber: order.orderNumber,
+    sheetDeleted: gasResult.sheetDeleted !== false,
+    rowNotFound: gasResult.rowNotFound === true,
+    spreadsheetUrl: gasResult.spreadsheetUrl || ''
+  };
 };
 
 export const saveAdminSettings = async (settings) => {
