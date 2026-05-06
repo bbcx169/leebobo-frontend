@@ -23,9 +23,13 @@ function doPost(e) {
     // 2. 儲存系統設定
     if (data.action === 'save_settings') {
       const props = PropertiesService.getScriptProperties();
-      props.setProperty('reminderEnabled', String(data.reminderEnabled));
-      props.setProperty('reminderTime', data.reminderTime);
-      manageReminderTrigger(data.reminderEnabled, data.reminderTime);
+      const reminderEnabled = data.reminderEnabled === true || String(data.reminderEnabled).toLowerCase() === 'true';
+      const reminderTime = String(data.reminderTime || '11:00').trim();
+      props.setProperty('reminderEnabled', reminderEnabled ? 'true' : 'false');
+      props.setProperty('reminderTime', reminderTime);
+      props.setProperty('REMINDER_ENABLED', reminderEnabled ? 'true' : 'false');
+      props.setProperty('REMINDER_TIME', reminderTime);
+      manageReminderTrigger(reminderEnabled, reminderTime);
       return ContentService.createTextOutput(JSON.stringify({ status: 'success' })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -304,8 +308,10 @@ function doGet(e) {
 
   if (e.parameter && e.parameter.action === 'get_settings') {
     const props = PropertiesService.getScriptProperties();
-    const enabled = props.getProperty('reminderEnabled') !== 'false'; 
-    const time = props.getProperty('reminderTime') || '11:00';
+    const lowercaseEnabled = props.getProperty('reminderEnabled');
+    const uppercaseEnabled = props.getProperty('REMINDER_ENABLED');
+    const enabled = (lowercaseEnabled !== null ? lowercaseEnabled : uppercaseEnabled) !== 'false'; 
+    const time = props.getProperty('reminderTime') || props.getProperty('REMINDER_TIME') || '11:00';
     return ContentService.createTextOutput(JSON.stringify({ status: 'success', data: { reminderEnabled: enabled, reminderTime: time } })).setMimeType(ContentService.MimeType.JSON);
   }
 

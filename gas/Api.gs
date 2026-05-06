@@ -235,9 +235,14 @@ function jsonResponse(payload) {
 
 function getAdminSettings() {
   const props = PropertiesService.getScriptProperties();
+  const lowercaseEnabled = props.getProperty('reminderEnabled');
+  const uppercaseEnabled = props.getProperty('REMINDER_ENABLED');
+  const lowercaseTime = props.getProperty('reminderTime');
+  const uppercaseTime = props.getProperty('REMINDER_TIME');
+
   return {
-    reminderEnabled: props.getProperty('REMINDER_ENABLED') !== 'false',
-    reminderTime: props.getProperty('REMINDER_TIME') || '11:00'
+    reminderEnabled: (lowercaseEnabled !== null ? lowercaseEnabled : uppercaseEnabled) !== 'false',
+    reminderTime: lowercaseTime || uppercaseTime || '11:00'
   };
 }
 
@@ -250,8 +255,14 @@ function saveAdminSettings(data) {
   }
 
   const props = PropertiesService.getScriptProperties();
+  props.setProperty('reminderEnabled', reminderEnabled ? 'true' : 'false');
+  props.setProperty('reminderTime', reminderTime);
   props.setProperty('REMINDER_ENABLED', reminderEnabled ? 'true' : 'false');
   props.setProperty('REMINDER_TIME', reminderTime);
+
+  if (typeof manageReminderTrigger === 'function') {
+    manageReminderTrigger(reminderEnabled, reminderTime);
+  }
 
   return {
     reminderEnabled: reminderEnabled,
