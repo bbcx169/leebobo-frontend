@@ -235,7 +235,7 @@ function AdminDashboardContent() {
     },
     onError: (err) => {
       console.error('Save settings failed:', err);
-      setAlertMsg('儲存設定失敗，請稍後再試。');
+      setAlertMsg(`儲存設定失敗：${err.message}`);
     }
   });
 

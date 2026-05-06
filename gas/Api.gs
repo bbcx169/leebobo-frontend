@@ -137,7 +137,17 @@ function doPost(e) {
       }
     }
 
-    // 5. 處理新訂單 (更新顧客收執信件內容)
+    // 5. 儲存後台提醒設定
+    if (data.action === 'save_settings') {
+      try {
+        const settings = saveAdminSettings(data);
+        return jsonResponse({ status: 'success', data: settings });
+      } catch (err) {
+        return jsonResponse({ status: 'error', message: err.toString() });
+      }
+    }
+
+    // 6. 處理新訂單 (更新顧客收執信件內容)
     if (data.action === 'create_order') {
       const orderLock = LockService.getScriptLock();
       try {
@@ -211,6 +221,9 @@ function doGet(e) {
   if (e.parameter && e.parameter.action === 'verify_admin') {
     return ContentService.createTextOutput(JSON.stringify({ status: 'success', isAdmin: ADMIN_LINE_IDS.includes(e.parameter.userId) })).setMimeType(ContentService.MimeType.JSON);
   }
+  if (e.parameter && e.parameter.action === 'get_settings') {
+    return jsonResponse({ status: 'success', data: getAdminSettings() });
+  }
   return ContentService.createTextOutput("微服務 API 正常運作中！");
 }
 
@@ -218,6 +231,32 @@ function jsonResponse(payload) {
   return ContentService
     .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function getAdminSettings() {
+  const props = PropertiesService.getScriptProperties();
+  return {
+    reminderEnabled: props.getProperty('REMINDER_ENABLED') !== 'false',
+    reminderTime: props.getProperty('REMINDER_TIME') || '11:00'
+  };
+}
+
+function saveAdminSettings(data) {
+  const reminderEnabled = data.reminderEnabled === true || String(data.reminderEnabled).toLowerCase() === 'true';
+  const reminderTime = String(data.reminderTime || '11:00').trim();
+
+  if (!/^\d{2}:\d{2}$/.test(reminderTime)) {
+    throw new Error('提醒時間格式錯誤，需為 HH:mm');
+  }
+
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('REMINDER_ENABLED', reminderEnabled ? 'true' : 'false');
+  props.setProperty('REMINDER_TIME', reminderTime);
+
+  return {
+    reminderEnabled: reminderEnabled,
+    reminderTime: reminderTime
+  };
 }
 
 function findOrderPdfFile(data) {
