@@ -11,7 +11,7 @@ export function formatSpecificDetails({ isPickup = false, locationName = '', add
     return `${ORDER_DETAIL_LABELS.pickupAddress}${cleanAddress}`;
   }
 
-  const cleanLocationName = String(locationName || '未提供').trim() || '未提供';
+  const cleanLocationName = String(locationName || '').trim();
   return `${ORDER_DETAIL_LABELS.location}${cleanLocationName}\n${ORDER_DETAIL_LABELS.address}${cleanAddress}`;
 }
 
