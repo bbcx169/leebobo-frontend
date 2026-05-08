@@ -163,21 +163,43 @@ firebase deploy --only firestore:rules
 #### 設定管理員 custom claim
 
 1. 在 Firebase Console 啟用 Authentication 的 Google provider 與 Email/Password provider。
-2. Google 管理員先用 Google 帳戶登入一次，讓 Firebase Auth 建立使用者紀錄；Email/Password 管理員可直接在 Authentication Users 建立帳號。
-3. 準備 Firebase Admin SDK service account JSON，並設定本機環境變數：
+2. 先建立 Firebase Authentication user：
+
+Google 帳號：
+
+- 請管理員先到後台登入一次。
+- 第一次登入後若看到「無權限」是正常的，目的只是讓 Firebase Authentication 建立該 Google user。
+- 到 Firebase Console → Authentication → Users，找到剛剛登入的 Google 帳號並確認 Email。
+
+Email/Password 帳號：
+
+- 到 Firebase Console → Authentication → Users。
+- 手動新增 Email/Password user，或讓使用者透過未來的註冊流程建立帳號。
+- 確認該 user 的 Email。
+
+3. 準備 Firebase Admin SDK service account JSON，並設定本機 PowerShell 環境變數：
 
 ```powershell
 $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\service-account.json"
 $env:FIREBASE_PROJECT_ID="leebobo-frontend"
 ```
 
-4. 設定管理員 claim：
+4. 對該 user 設定管理員 claim：
 
-```bash
-npm run admin:set-claim -- admin@example.com true
+```powershell
+npm.cmd run admin:set-claim -- 你的GoogleEmail@gmail.com true
 ```
 
-管理員需登出後重新登入，ID token 才會帶入 `admin: true`。
+或：
+
+```powershell
+npm.cmd run admin:set-claim -- admin@example.com true
+```
+
+5. 回到後台，按「登出並切換帳號」。
+6. 重新用同一個 Google 帳戶或 Email/Password 帳號登入。
+
+重點：設定 custom claim 後，舊 token 不會立刻更新，所以一定要登出再登入，ID token 才會帶入 `admin: true`。
 
 #### GAS admin token 驗證
 
