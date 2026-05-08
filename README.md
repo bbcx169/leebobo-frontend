@@ -63,7 +63,13 @@ src/
     orderDetails.js               # 地址與地點資訊格式化
 
 gas/
-  Api.gs                          # GAS Web App API，唯一維護來源
+  Api.gs                          # GAS Web App 入口與 action routing
+  AuthService.gs                  # Firebase admin ID token / custom claim 驗證
+  OrderActions.gs                 # create_order / update_pdf / resend / delete action 實作
+  DrivePdfService.gs              # Drive PDF 查找與檔案 ID 工具
+  OrderReportService.gs           # Google Sheets 訂單報表同步
+  NotificationService.gs          # LINE / Telegram 通知
+  SettingsService.gs              # 後台提醒設定
   EnvConfig.gs / EnvConfig.js     # GAS 環境變數與常數
   PdfService.gs / PdfService.js   # PDF 產生邏輯
   PdfTemplate.html                # PDF HTML 模板
@@ -208,8 +214,10 @@ GAS 高風險 action 已要求 Firebase admin ID token：
 - `get_settings`
 - `save_settings`
 - `update_pdf`
-- `resendPdf` / `admin_resend_pdf`
+- `admin_resend_pdf`
 - `mark_order_deleted`
+
+只有後台使用的 `admin_resend_pdf` 需要 Firebase admin ID token；客戶端補寄使用的 `resendPdf` 不需要 admin token。
 
 GAS 部署後，請確認 Script Properties 或 `gas/EnvConfig.gs` 有設定：
 
@@ -248,7 +256,7 @@ src/pages/Checkout.jsx
 
 修改 `gas/` 內檔案後，必須重新部署 Apps Script Web App，前端才會打到新版邏輯。
 
-`gas/Api.gs` 是 GAS API 的唯一維護來源。`gas/_archive/Api.legacy.js` 僅供歷史參考，不得部署，也不需要同步修改。
+`gas/` 目錄是 GAS API 的正式維護來源；`Api.gs` 只保留 Web App 入口與 action routing。`gas/_archive/Api.legacy.js` 僅供歷史參考，不得部署，也不需要同步修改。
 
 本專案已移除 clasp 專案綁定與登入設定，不再透過 clasp push/deploy 維護 GAS。更新 GAS 時，請手動將 `gas/` 內對應檔案內容同步到 Apps Script 編輯器，或另行建立明確的部署流程。
 
@@ -323,7 +331,7 @@ settings/productAvailability
 
 ## 已知維護重點
 
-- `gas/Api.gs` 是 GAS API 唯一維護來源；`gas/_archive/Api.legacy.js` 僅保留歷史參考。
+- `gas/` 目錄是 GAS API 正式維護來源；`gas/_archive/Api.legacy.js` 僅保留歷史參考。
 - 前端有部分文字因歷史編碼問題呈現亂碼，功能未必受影響，但後續應逐步清理。
 - 舊版 `OrderForm` 已封存於 `src/components/_archive/OrderForm.legacy.jsx`，待專案運作穩定後再評估移除。
 - GAS URL 與 Firebase config 目前寫在程式碼內，正式維運建議集中到環境變數或設定檔。
