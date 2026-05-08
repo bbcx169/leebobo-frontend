@@ -1,4 +1,5 @@
 import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 /**
@@ -20,3 +21,4 @@ const app = initializeApp(firebaseConfig);
 // 初始化並導出 Firestore 資料庫實例
 // 以後其他檔案（如 AdminDashboard）要讀寫資料庫都從這裡 import db
 export const db = getFirestore(app);
+export const auth = getAuth(app);

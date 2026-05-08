@@ -15,14 +15,26 @@
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
+    const adminActions = [
+      'get_settings',
+      'admin_resend_pdf',
+      'resendPdf',
+      'update_pdf',
+      'mark_order_deleted',
+      'save_settings'
+    ];
+
+    if (adminActions.indexOf(data.action) !== -1) {
+      requireFirebaseAdmin(data);
+    }
 
     // 1. 備用密碼驗證 API
     if (data.action === 'verify_password') {
-      if (data.password === ADMIN_PASSWORD) {
-        return ContentService.createTextOutput(JSON.stringify({ 'status': 'success' })).setMimeType(ContentService.MimeType.JSON);
-      } else {
-        return ContentService.createTextOutput(JSON.stringify({ 'status': 'error', 'message': '密碼錯誤' })).setMimeType(ContentService.MimeType.JSON);
-      }
+      return jsonResponse({ status: 'error', message: 'verify_password 已停用，請改用 Firebase Auth 管理員登入。' });
+    }
+
+    if (data.action === 'get_settings') {
+      return jsonResponse({ status: 'success', data: getAdminSettings() });
     }
 
     // 2. 補發 PDF 至 Email
@@ -222,7 +234,7 @@ function doGet(e) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'success', isAdmin: ADMIN_LINE_IDS.includes(e.parameter.userId) })).setMimeType(ContentService.MimeType.JSON);
   }
   if (e.parameter && e.parameter.action === 'get_settings') {
-    return jsonResponse({ status: 'success', data: getAdminSettings() });
+    return jsonResponse({ status: 'error', message: 'get_settings now requires Firebase admin authentication via POST.' });
   }
   return ContentService.createTextOutput("微服務 API 正常運作中！");
 }
@@ -231,6 +243,72 @@ function jsonResponse(payload) {
   return ContentService
     .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function requireFirebaseAdmin(data) {
+  const authResult = verifyFirebaseAdminIdToken(data && data.idToken);
+  if (!authResult.isAdmin) {
+    throw new Error(authResult.message || '未授權：需要 Firebase admin 權限。');
+  }
+  return authResult;
+}
+
+function verifyFirebaseAdminIdToken(idToken) {
+  const token = String(idToken || '').trim();
+  if (!token) {
+    return { isAdmin: false, message: '缺少 Firebase ID token。' };
+  }
+
+  const apiKey = getScriptConfigValue(
+    'FIREBASE_WEB_API_KEY',
+    typeof FIREBASE_WEB_API_KEY !== 'undefined' ? FIREBASE_WEB_API_KEY : 'AIzaSyCBD_M8WxA_a3Q47w9llaFgujPFI9C7zEI'
+  );
+
+  if (!apiKey) {
+    return { isAdmin: false, message: 'GAS 尚未設定 FIREBASE_WEB_API_KEY。' };
+  }
+
+  try {
+    const response = UrlFetchApp.fetch(
+      'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + encodeURIComponent(apiKey),
+      {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify({ idToken: token }),
+        muteHttpExceptions: true
+      }
+    );
+
+    if (response.getResponseCode() !== 200) {
+      Logger.log('Firebase token lookup failed: ' + response.getContentText());
+      return { isAdmin: false, message: 'Firebase ID token 驗證失敗。' };
+    }
+
+    const result = JSON.parse(response.getContentText());
+    const user = result.users && result.users[0];
+    if (!user || user.disabled === true) {
+      return { isAdmin: false, message: 'Firebase 使用者不存在或已停用。' };
+    }
+
+    const customAttributes = user.customAttributes ? JSON.parse(user.customAttributes) : {};
+    return {
+      isAdmin: customAttributes.admin === true,
+      uid: user.localId,
+      email: user.email || '',
+      message: customAttributes.admin === true ? '' : 'Firebase 使用者沒有 admin custom claim。'
+    };
+  } catch (err) {
+    Logger.log('Firebase token verification error: ' + err.toString());
+    return { isAdmin: false, message: 'Firebase ID token 驗證發生錯誤。' };
+  }
+}
+
+function getScriptConfigValue(keyName, fallbackValue) {
+  try {
+    return PropertiesService.getScriptProperties().getProperty(keyName) || fallbackValue || '';
+  } catch (e) {
+    return fallbackValue || '';
+  }
 }
 
 function getAdminSettings() {

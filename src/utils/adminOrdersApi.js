@@ -1,4 +1,5 @@
 import { db } from './firebase';
+import { getAdminIdToken } from './adminAuth';
 import {
   collection,
   getDocs,
@@ -30,11 +31,17 @@ export const getOrderSearchMode = (keyword) => {
   return 'unsupported';
 };
 
-export const callGasApi = async (payload) => {
+export const callGasApi = async (payload, options = {}) => {
+  const finalPayload = { ...payload };
+
+  if (options.requireAdmin !== false && !finalPayload.idToken) {
+    finalPayload.idToken = await getAdminIdToken();
+  }
+
   const response = await fetch(SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(finalPayload)
   });
 
   const result = await response.json();
@@ -46,11 +53,7 @@ export const callGasApi = async (payload) => {
 };
 
 export const fetchAdminSettings = async () => {
-  const response = await fetch(`${SCRIPT_URL}?action=get_settings`);
-  const result = await response.json();
-  if (result.status !== 'success') {
-    throw new Error(result.message || '無法取得系統設定');
-  }
+  const result = await callGasApi({ action: 'get_settings' });
   return result.data;
 };
 

@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import liff from '@line/liff';
 import { QueryClient, QueryClientProvider, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import DashboardStats from '../components/Admin/DashboardStats';
@@ -7,9 +6,9 @@ import OrderTable from '../components/Admin/OrderTable';
 import AdminModals from '../components/Admin/AdminModals';
 import RevenueReport from '../components/Admin/RevenueReport';
 import { products } from '../constants/data';
+import { onAdminAuthStateChanged, signInAdminWithEmail, signOutAdmin } from '../utils/adminAuth';
 import {
   SCRIPT_URL,
-  callGasApi,
   deleteAdminOrder,
   fetchAdminOrdersPage,
   fetchAdminSettings,
@@ -25,7 +24,6 @@ import {
   saveProductAvailability
 } from '../utils/productAvailability';
 
-const LIFF_ID = '2009807397-WPVPBokl';
 const ORDER_PAGE_SIZE = 50;
 
 const productMapping = {
@@ -80,35 +78,37 @@ function AdminDashboardContent() {
   const [resendModal, setResendModal] = useState({ isOpen: false, order: null, email: '' });
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, order: null, confirmText: '' });
 
+  const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
-  const [isVerifyingPwd, setIsVerifyingPwd] = useState(false);
+  const [isVerifyingLogin, setIsVerifyingLogin] = useState(false);
 
   useEffect(() => {
-    async function initializeLiff() {
+    const unsubscribe = onAdminAuthStateChanged(async (firebaseUser) => {
+      if (!firebaseUser) {
+        setUserProfile(null);
+        setAuthStatus('unauth');
+        return;
+      }
+
       try {
-        await liff.init({ liffId: LIFF_ID });
-        if (!liff.isLoggedIn()) {
-          setAuthStatus('unauth');
-          return;
-        }
-
-        const profile = await liff.getProfile();
-        const res = await fetch(`${SCRIPT_URL}?action=verify_admin&userId=${profile.userId}`);
-        const data = await res.json();
-
-        if (data.status === 'success' && data.isAdmin) {
-          setUserProfile(profile);
+        const tokenResult = await firebaseUser.getIdTokenResult(true);
+        if (tokenResult.claims.admin === true) {
+          setUserProfile({
+            displayName: firebaseUser.displayName || firebaseUser.email || 'Firebase 管理員',
+            pictureUrl: firebaseUser.photoURL || null,
+            email: firebaseUser.email
+          });
           setAuthStatus('logged_in');
         } else {
           setAuthStatus('unauthorized_user');
         }
       } catch (err) {
-        console.error('LIFF admin check failed:', err);
+        console.error('Firebase admin auth check failed:', err);
         setAuthStatus('unauth');
       }
-    }
+    });
 
-    initializeLiff();
+    return unsubscribe;
   }, []);
 
   const rawSearchTerm = searchTerm.trim();
@@ -255,31 +255,25 @@ function AdminDashboardContent() {
     }
   });
 
-  const handleLogin = () => liff.login({ redirectUri: window.location.href });
-  const handleLogout = () => {
-    liff.logout();
-    window.location.reload();
+  const handleLogout = async () => {
+    await signOutAdmin();
+    setUserProfile(null);
+    setAuthStatus('unauth');
   };
 
   const handlePasswordLogin = async () => {
-    if (!passwordInput) {
-      setAlertMsg('請輸入管理密碼。');
+    if (!emailInput || !passwordInput) {
+      setAlertMsg('請輸入管理員 Email 與密碼。');
       return;
     }
 
-    setIsVerifyingPwd(true);
+    setIsVerifyingLogin(true);
     try {
-      const result = await callGasApi({ action: 'verify_password', password: passwordInput });
-      if (result.status === 'success') {
-        setUserProfile({ displayName: '管理員（密碼登入）', pictureUrl: null });
-        setAuthStatus('logged_in');
-      } else {
-        setAlertMsg('密碼錯誤，請再確認一次。');
-      }
+      await signInAdminWithEmail(emailInput.trim(), passwordInput);
     } catch (err) {
       setAlertMsg(`登入失敗：${err.message}`);
     } finally {
-      setIsVerifyingPwd(false);
+      setIsVerifyingLogin(false);
     }
   };
 
@@ -354,26 +348,27 @@ function AdminDashboardContent() {
         )}
 
         <div className="bg-white p-10 md:p-12 rounded-3xl shadow-xl text-center max-w-md w-full">
-          <h1 className="text-3xl font-bold text-amberRed mb-8 tracking-widest">後台管理登入</h1>
-          <button onClick={handleLogin} className="w-full bg-[#06C755] text-white px-10 py-5 rounded-2xl font-bold text-xl shadow-lg hover:scale-105 transition-transform mb-6">
-            使用 LINE 登入
-          </button>
-          <div className="flex items-center gap-3 my-8">
-            <div className="h-px bg-gray-200 flex-1"></div>
-            <span className="text-gray-400 text-sm font-bold">或使用管理密碼</span>
-            <div className="h-px bg-gray-200 flex-1"></div>
-          </div>
+          <h1 className="text-3xl font-bold text-amberRed mb-3 tracking-widest">後台管理登入</h1>
+          <p className="text-gray-500 font-bold mb-8">請使用已授權 admin claim 的 Firebase Auth 帳號。</p>
           <div className="space-y-4">
             <input
+              type="email"
+              placeholder="管理員 Email"
+              value={emailInput}
+              onChange={e => setEmailInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
+              className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-lg outline-none focus:ring-2 focus:ring-gray-400 text-center placeholder:tracking-normal"
+            />
+            <input
               type="password"
-              placeholder="請輸入管理密碼"
+              placeholder="管理員密碼"
               value={passwordInput}
               onChange={e => setPasswordInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
               className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-lg outline-none focus:ring-2 focus:ring-gray-400 text-center tracking-widest placeholder:tracking-normal"
             />
-            <button onClick={handlePasswordLogin} disabled={isVerifyingPwd} className="w-full bg-gray-800 text-white px-10 py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-black transition-colors disabled:opacity-50">
-              {isVerifyingPwd ? '驗證中...' : '密碼登入'}
+            <button onClick={handlePasswordLogin} disabled={isVerifyingLogin} className="w-full bg-gray-800 text-white px-10 py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-black transition-colors disabled:opacity-50">
+              {isVerifyingLogin ? '登入中...' : '登入後台'}
             </button>
           </div>
         </div>
@@ -382,7 +377,14 @@ function AdminDashboardContent() {
   }
 
   if (authStatus === 'unauthorized_user') {
-    return <div className="h-screen flex items-center justify-center bg-gray-50 text-red-500 font-bold text-2xl">無權限：此 LINE 帳號不是管理員。</div>;
+    return (
+      <div className="h-screen flex flex-col gap-6 items-center justify-center bg-gray-50 text-center px-6">
+        <div className="text-red-500 font-bold text-2xl">無權限：此 Firebase 帳號尚未設定管理員權限。</div>
+        <button onClick={handleLogout} className="px-8 py-3 bg-gray-800 text-white font-bold rounded-2xl hover:bg-black transition-colors">
+          登出並切換帳號
+        </button>
+      </div>
+    );
   }
 
   const navItems = [

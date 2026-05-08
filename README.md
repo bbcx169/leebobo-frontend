@@ -144,16 +144,15 @@ firestore.indexes.json
 - `useQuery(['adminOrderSearch', searchMode, keyword])`：訂單編號 / 手機查詢
 - `useMutation`：修改訂單、補發 PDF、刪除訂單、儲存設定
 
-### Firestore Rules 遷移狀態
+### Firestore Rules 與後台安全收斂
 
-目前已新增 `firestore.rules`，但規則屬於「過渡正式版」：
+後台已改用 Firebase Auth + custom claims 判斷管理員權限。Firestore rules 目前收斂為：
 
-- 保留前台直接建立訂單
-- 保留訂單查詢直接讀取訂單
-- 保留後台直接更新 / 刪除訂單
-- 保留後台直接寫入商品上下架設定
-
-原因是目前專案尚未導入 Firebase Auth，也尚未將敏感操作全部移到 GAS / Cloud Functions。若現在直接關閉未授權讀寫，前台結帳與後台管理會中斷。
+- 前台仍可直接建立訂單。
+- 前台僅可補寫 `pdfDownloadUrl` / `sheetSynced` / `sheetSyncError`。
+- 後台修改與刪除訂單需 `request.auth.token.admin == true`。
+- 商品上下架設定前台可讀，只有 admin 可寫。
+- 訂單查詢仍保留公開讀取，因為目前前台查詢流程仍直接 query Firestore。
 
 部署 Firestore rules：
 
@@ -161,12 +160,46 @@ firestore.indexes.json
 firebase deploy --only firestore:rules
 ```
 
+#### 設定管理員 custom claim
+
+1. 在 Firebase Console 啟用 Authentication 的 Email/Password provider。
+2. 建立後台管理員 Email/Password 帳號。
+3. 準備 Firebase Admin SDK service account JSON，並設定本機環境變數：
+
+```powershell
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\service-account.json"
+$env:FIREBASE_PROJECT_ID="leebobo-frontend"
+```
+
+4. 設定管理員 claim：
+
+```bash
+npm run admin:set-claim -- admin@example.com true
+```
+
+管理員需登出後重新登入，ID token 才會帶入 `admin: true`。
+
+#### GAS admin token 驗證
+
+GAS 高風險 action 已要求 Firebase admin ID token：
+
+- `get_settings`
+- `save_settings`
+- `update_pdf`
+- `resendPdf` / `admin_resend_pdf`
+- `mark_order_deleted`
+
+GAS 部署後，請確認 Script Properties 或 `gas/EnvConfig.gs` 有設定：
+
+```text
+FIREBASE_WEB_API_KEY
+```
+
 後續安全收斂方向：
 
 1. 前台建立訂單改由 GAS 或 Cloud Functions 代寫 Firestore
-2. 後台修改 / 刪除訂單改由具權限的 server-side API 處理
-3. 或導入 Firebase Auth + custom claims 辨識管理員
-4. 最後將 `orders` 的公開讀寫權限收緊
+2. 訂單查詢改由受控 API 執行，移除 `orders` 公開讀取
+3. 後台 Firestore 寫入改由 GAS / Cloud Functions 代寫
 
 ## Google Apps Script
 

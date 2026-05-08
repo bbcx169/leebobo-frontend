@@ -2,24 +2,9 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    /*
-     * Transitional production rules.
-     *
-     * Current application constraints:
-     * - Frontend checkout creates orders directly from the browser.
-     * - Order inquiry reads orders by ordererPhone and can update pdfDownloadUrl.
-     * - AdminDashboard reads, updates, and deletes orders directly from the browser.
-     * - Product availability is read by the frontend and written by AdminDashboard.
-     *
-     * Because the app does not currently use Firebase Auth or server-side Admin SDK
-     * for these operations, these rules intentionally preserve the existing access
-     * model. This prevents a production-mode rules deploy from breaking checkout
-     * and admin workflows, but it is not the final security posture.
-     *
-     * Next hardening step:
-     * Move privileged writes/deletes to GAS or Cloud Functions, or introduce
-     * Firebase Auth + custom claims for admin users, then restrict these rules.
-     */
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
 
     function isStringField(fieldName) {
       return request.resource.data[fieldName] is string;
@@ -46,25 +31,32 @@ service cloud.firestore {
         && isNumberField('createdAt');
     }
 
+    function isPublicPdfStatusUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'pdfDownloadUrl',
+          'sheetSynced',
+          'sheetSyncError'
+        ])
+        && (!('pdfDownloadUrl' in request.resource.data) || request.resource.data.pdfDownloadUrl is string)
+        && (!('sheetSynced' in request.resource.data) || request.resource.data.sheetSynced is bool)
+        && (!('sheetSyncError' in request.resource.data) || request.resource.data.sheetSyncError is string);
+    }
+
     match /orders/{orderId} {
+      // Public read is still required by the existing order inquiry flow.
       allow read: if true;
       allow create: if isValidOrderCreate();
-
-      // Transitional: required for current admin edit/delete and PDF URL updates.
-      allow update, delete: if true;
+      allow update: if isAdmin() || isPublicPdfStatusUpdate();
+      allow delete: if isAdmin();
     }
 
     match /settings/productAvailability {
       allow read: if true;
-
-      // Transitional: AdminDashboard currently writes this directly from frontend.
-      allow write: if true;
+      allow write: if isAdmin();
     }
 
     match /settings/{document=**} {
       allow read: if true;
-
-      // No other settings documents are currently required from the frontend.
       allow write: if false;
     }
 

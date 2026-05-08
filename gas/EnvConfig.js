@@ -37,7 +37,7 @@ const ADMIN_LINE_IDS = [
   'U4460cd7d1f421c42d6dbf0f07253580e', 
   '2009807397-WPVPBokl'
 ];
-const ADMIN_PASSWORD = 'leebobo_admin';
+const FIREBASE_WEB_API_KEY = 'AIzaSyCBD_M8WxA_a3Q47w9llaFgujPFI9C7zEI';
 
 // 📊 試算表與雲端硬碟設定
 const SHEET_TAB_NAME = '工作表1';

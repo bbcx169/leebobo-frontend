@@ -32,9 +32,9 @@ function setTelegramNotificationProperties(botToken, chatId) {
   return 'Telegram notification properties updated.';
 }
 
-// 🔐 權限與安全 (備用密碼)
+// 🔐 權限與安全
 const ADMIN_LINE_IDS = ['U4460cd7d1f421c42d6dbf0f07253580e'];
-const ADMIN_PASSWORD = 'leebobo_admin';
+const FIREBASE_WEB_API_KEY = 'AIzaSyCBD_M8WxA_a3Q47w9llaFgujPFI9C7zEI';
 
 // 📁 雲端硬碟 PDF 資料夾設定
 const PDF_FOLDER_ID = '1GrWJtbw51RTZ-a0fGkrCqbiLpLgOqxH7';
