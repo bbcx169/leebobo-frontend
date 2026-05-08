@@ -3,6 +3,7 @@ import {
   getIdToken,
   getIdTokenResult,
   onAuthStateChanged,
+  signInWithEmailAndPassword,
   signInWithPopup,
   signOut
 } from 'firebase/auth';
@@ -31,6 +32,18 @@ googleProvider.setCustomParameters({
 
 export const signInAdminWithGoogle = async () => {
   const credential = await signInWithPopup(auth, googleProvider);
+  const hasAdminClaim = await isAdminUser(credential.user, true);
+
+  if (!hasAdminClaim) {
+    await signOut(auth);
+    throw new Error('此 Firebase 帳號尚未設定 admin 權限。');
+  }
+
+  return credential.user;
+};
+
+export const signInAdminWithEmail = async (email, password) => {
+  const credential = await signInWithEmailAndPassword(auth, email, password);
   const hasAdminClaim = await isAdminUser(credential.user, true);
 
   if (!hasAdminClaim) {

@@ -10,7 +10,7 @@
 - Tailwind CSS
 - Firebase Firestore
 - TanStack React Query（後台訂單資料流）
-- Firebase Auth Google Provider（後台管理員登入）
+- Firebase Auth Google Provider / Email Password（後台管理員登入）
 - Google Apps Script
 - Google Sheets / Drive / MailApp
 
@@ -28,7 +28,7 @@
 
 ### 後台
 
-- Firebase Auth Google 帳戶登入 + custom claims 管理員驗證
+- Firebase Auth Google 帳戶與 Email/Password 登入 + custom claims 管理員驗證
 - 訂單列表分頁載入
 - 訂單編號 / 手機 server-side 搜尋
 - 修改訂單資訊並重產 PDF
@@ -162,8 +162,8 @@ firebase deploy --only firestore:rules
 
 #### 設定管理員 custom claim
 
-1. 在 Firebase Console 啟用 Authentication 的 Google provider。
-2. 管理員先用 Google 帳戶登入一次，讓 Firebase Auth 建立使用者紀錄。
+1. 在 Firebase Console 啟用 Authentication 的 Google provider 與 Email/Password provider。
+2. Google 管理員先用 Google 帳戶登入一次，讓 Firebase Auth 建立使用者紀錄；Email/Password 管理員可直接在 Authentication Users 建立帳號。
 3. 準備 Firebase Admin SDK service account JSON，並設定本機環境變數：
 
 ```powershell
@@ -294,9 +294,10 @@ settings/productAvailability
 登入方式：
 
 - Firebase Auth Google 帳戶登入
+- Firebase Auth Email/Password 登入
 - Firebase custom claims 驗證 `admin: true`
 
-不再使用 LIFF 或後台共用密碼登入。
+不再使用 LIFF 或 GAS 後台共用密碼登入。Email/Password 是 Firebase Authentication 帳號，不是舊的共用密碼。
 
 ## 已知維護重點
 
