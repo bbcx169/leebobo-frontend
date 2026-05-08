@@ -10,7 +10,7 @@
 - Tailwind CSS
 - Firebase Firestore
 - TanStack React Query（後台訂單資料流）
-- LINE LIFF（後台管理員登入）
+- Firebase Auth Google Provider（後台管理員登入）
 - Google Apps Script
 - Google Sheets / Drive / MailApp
 
@@ -28,7 +28,7 @@
 
 ### 後台
 
-- LINE LIFF 管理員驗證與密碼備用登入
+- Firebase Auth Google 帳戶登入 + custom claims 管理員驗證
 - 訂單列表分頁載入
 - 訂單編號 / 手機 server-side 搜尋
 - 修改訂單資訊並重產 PDF
@@ -84,7 +84,7 @@ npm install
 npm run dev
 ```
 
-Vite 設定使用 `@vitejs/plugin-basic-ssl`，本機開發會以 HTTPS 啟動，方便 LIFF 或瀏覽器安全限制相關功能測試。
+Vite 設定使用 `@vitejs/plugin-basic-ssl`，本機開發會以 HTTPS 啟動，方便 Firebase Auth 與瀏覽器安全限制相關功能測試。
 
 ### 建置
 
@@ -162,8 +162,8 @@ firebase deploy --only firestore:rules
 
 #### 設定管理員 custom claim
 
-1. 在 Firebase Console 啟用 Authentication 的 Email/Password provider。
-2. 建立後台管理員 Email/Password 帳號。
+1. 在 Firebase Console 啟用 Authentication 的 Google provider。
+2. 管理員先用 Google 帳戶登入一次，讓 Firebase Auth 建立使用者紀錄。
 3. 準備 Firebase Admin SDK service account JSON，並設定本機環境變數：
 
 ```powershell
@@ -293,14 +293,10 @@ settings/productAvailability
 
 登入方式：
 
-- LINE LIFF 管理員驗證
-- 管理密碼備用登入
+- Firebase Auth Google 帳戶登入
+- Firebase custom claims 驗證 `admin: true`
 
-LIFF ID 目前定義在：
-
-```text
-src/pages/AdminDashboard.jsx
-```
+不再使用 LIFF 或後台共用密碼登入。
 
 ## 已知維護重點
 

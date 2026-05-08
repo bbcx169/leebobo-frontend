@@ -28,16 +28,11 @@ function doPost(e) {
       requireFirebaseAdmin(data);
     }
 
-    // 1. 備用密碼驗證 API
-    if (data.action === 'verify_password') {
-      return jsonResponse({ status: 'error', message: 'verify_password 已停用，請改用 Firebase Auth 管理員登入。' });
-    }
-
     if (data.action === 'get_settings') {
       return jsonResponse({ status: 'success', data: getAdminSettings() });
     }
 
-    // 2. 補發 PDF 至 Email
+    // 1. 補發 PDF 至 Email
     if (data.action === 'admin_resend_pdf' || data.action === 'resendPdf') {
       const resendLock = LockService.getScriptLock();
       try {

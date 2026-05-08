@@ -6,7 +6,7 @@ import OrderTable from '../components/Admin/OrderTable';
 import AdminModals from '../components/Admin/AdminModals';
 import RevenueReport from '../components/Admin/RevenueReport';
 import { products } from '../constants/data';
-import { onAdminAuthStateChanged, signInAdminWithEmail, signOutAdmin } from '../utils/adminAuth';
+import { onAdminAuthStateChanged, signInAdminWithGoogle, signOutAdmin } from '../utils/adminAuth';
 import {
   SCRIPT_URL,
   deleteAdminOrder,
@@ -78,8 +78,6 @@ function AdminDashboardContent() {
   const [resendModal, setResendModal] = useState({ isOpen: false, order: null, email: '' });
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, order: null, confirmText: '' });
 
-  const [emailInput, setEmailInput] = useState('');
-  const [passwordInput, setPasswordInput] = useState('');
   const [isVerifyingLogin, setIsVerifyingLogin] = useState(false);
 
   useEffect(() => {
@@ -261,15 +259,10 @@ function AdminDashboardContent() {
     setAuthStatus('unauth');
   };
 
-  const handlePasswordLogin = async () => {
-    if (!emailInput || !passwordInput) {
-      setAlertMsg('請輸入管理員 Email 與密碼。');
-      return;
-    }
-
+  const handleGoogleLogin = async () => {
     setIsVerifyingLogin(true);
     try {
-      await signInAdminWithEmail(emailInput.trim(), passwordInput);
+      await signInAdminWithGoogle();
     } catch (err) {
       setAlertMsg(`登入失敗：${err.message}`);
     } finally {
@@ -349,28 +342,15 @@ function AdminDashboardContent() {
 
         <div className="bg-white p-10 md:p-12 rounded-3xl shadow-xl text-center max-w-md w-full">
           <h1 className="text-3xl font-bold text-amberRed mb-3 tracking-widest">後台管理登入</h1>
-          <p className="text-gray-500 font-bold mb-8">請使用已授權 admin claim 的 Firebase Auth 帳號。</p>
-          <div className="space-y-4">
-            <input
-              type="email"
-              placeholder="管理員 Email"
-              value={emailInput}
-              onChange={e => setEmailInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
-              className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-lg outline-none focus:ring-2 focus:ring-gray-400 text-center placeholder:tracking-normal"
-            />
-            <input
-              type="password"
-              placeholder="管理員密碼"
-              value={passwordInput}
-              onChange={e => setPasswordInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
-              className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-lg outline-none focus:ring-2 focus:ring-gray-400 text-center tracking-widest placeholder:tracking-normal"
-            />
-            <button onClick={handlePasswordLogin} disabled={isVerifyingLogin} className="w-full bg-gray-800 text-white px-10 py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-black transition-colors disabled:opacity-50">
-              {isVerifyingLogin ? '登入中...' : '登入後台'}
-            </button>
-          </div>
+          <p className="text-gray-500 font-bold mb-8">請使用已授權 admin claim 的 Google 帳戶。</p>
+          <button
+            onClick={handleGoogleLogin}
+            disabled={isVerifyingLogin}
+            className="w-full bg-white text-gray-800 px-8 py-4 rounded-2xl font-bold text-lg shadow-lg border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-colors disabled:opacity-50 flex items-center justify-center gap-3"
+          >
+            <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-sm font-black text-blue-600">G</span>
+            {isVerifyingLogin ? '登入中...' : '使用 Google 帳戶登入'}
+          </button>
         </div>
       </div>
     );

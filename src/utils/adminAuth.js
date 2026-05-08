@@ -1,8 +1,9 @@
 import {
+  GoogleAuthProvider,
   getIdToken,
   getIdTokenResult,
   onAuthStateChanged,
-  signInWithEmailAndPassword,
+  signInWithPopup,
   signOut
 } from 'firebase/auth';
 
@@ -23,8 +24,13 @@ export const isAdminUser = async (user, forceRefresh = false) => {
   return claims.admin === true;
 };
 
-export const signInAdminWithEmail = async (email, password) => {
-  const credential = await signInWithEmailAndPassword(auth, email, password);
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
+
+export const signInAdminWithGoogle = async () => {
+  const credential = await signInWithPopup(auth, googleProvider);
   const hasAdminClaim = await isAdminUser(credential.user, true);
 
   if (!hasAdminClaim) {

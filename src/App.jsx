@@ -36,26 +36,6 @@ function AppContent() {
   const [isNavScrolled, setIsNavScrolled] = useState(false); 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); 
 
-  // ==========================================
-  // 🚀 核心優化：LIFF 登入路由攔截器 (修復 OAuth 憑證遺失問題)
-  // ==========================================
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const liffStatePath = params.get('liff.state');
-
-    if (liffStatePath) {
-      console.log('偵測到 LIFF 重導向，準備跳轉至:', liffStatePath);
-      
-      // ⚠️ 關鍵修正：必須保留 LINE 傳回來的 code 和 state 參數
-      params.delete('liff.state'); 
-      const remainingParams = params.toString();
-      
-      const destination = liffStatePath + (remainingParams ? `?${remainingParams}` : '');
-      
-      navigate(destination, { replace: true });
-    }
-  }, [location.search, navigate]);
-
   // 1. 導覽列滾動效果
   useEffect(() => {
     const handleScroll = () => setIsNavScrolled(window.scrollY > 50);
