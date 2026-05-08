@@ -18,7 +18,6 @@ function doPost(e) {
     const adminActions = [
       'get_settings',
       'admin_resend_pdf',
-      'resendPdf',
       'update_pdf',
       'mark_order_deleted',
       'save_settings'

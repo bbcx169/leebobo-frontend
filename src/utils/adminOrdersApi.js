@@ -131,7 +131,7 @@ export const updateAdminOrder = async ({ order, eventDate, eventTime, specificDe
 
 export const resendAdminOrderPdf = async ({ order, email }) => {
   return callGasApi({
-    action: 'resendPdf',
+    action: 'admin_resend_pdf',
     orderNumber: order.orderNumber,
     pdfDownloadUrl: order.pdfDownloadUrl,
     email
