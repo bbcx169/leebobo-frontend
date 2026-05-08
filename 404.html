@@ -5,6 +5,26 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>李伯伯糖葫蘆</title>
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var redirectedPath = params.get('p');
+
+        if (!redirectedPath) return;
+
+        params.delete('p');
+        var search = params.toString();
+        var basePath = window.location.pathname.endsWith('/')
+          ? window.location.pathname
+          : window.location.pathname + '/';
+        var nextUrl = basePath
+          + redirectedPath.replace(/^\//, '')
+          + (search ? '?' + search : '')
+          + window.location.hash;
+
+        window.history.replaceState(null, '', nextUrl);
+      })();
+    </script>
     <script type="module" crossorigin src="/leebobo-frontend/assets/index-DqDjp92g.js"></script>
     <link rel="modulepreload" crossorigin href="/leebobo-frontend/assets/jsx-runtime-CUBmso4R.js">
     <link rel="stylesheet" crossorigin href="/leebobo-frontend/assets/index-BEQbhsjc.css">
