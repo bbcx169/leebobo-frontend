@@ -14,7 +14,7 @@ function verifyFirebaseAdminIdToken(idToken) {
 
   const apiKey = getScriptConfigValue(
     'FIREBASE_WEB_API_KEY',
-    typeof FIREBASE_WEB_API_KEY !== 'undefined' ? FIREBASE_WEB_API_KEY : 'AIzaSyCBD_M8WxA_a3Q47w9llaFgujPFI9C7zEI'
+    typeof FIREBASE_WEB_API_KEY !== 'undefined' ? FIREBASE_WEB_API_KEY : ''
   );
 
   if (!apiKey) {
