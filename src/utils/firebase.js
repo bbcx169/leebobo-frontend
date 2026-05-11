@@ -2,12 +2,14 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-/**
- * 這些資訊來自您的 Firebase 控制台專案設定。
- * 直接寫入字串可避免部署至 GitHub Pages 時產生的環境變數讀取失敗。
- */
+const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+
+if (!firebaseApiKey) {
+  throw new Error("Missing VITE_FIREBASE_API_KEY. Set it in your local .env or deployment environment.");
+}
+
 const firebaseConfig = {
-  apiKey: "AIzaSyCBD_M8WxA_a3Q47w9llaFgujPFI9C7zEI",
+  apiKey: firebaseApiKey,
   authDomain: "leebobo-frontend.firebaseapp.com",
   projectId: "leebobo-frontend",
   storageBucket: "leebobo-frontend.firebasestorage.app",

@@ -219,7 +219,15 @@ GAS 高風險 action 已要求 Firebase admin ID token：
 
 只有後台使用的 `admin_resend_pdf` 需要 Firebase admin ID token；客戶端補寄使用的 `resendPdf` 不需要 admin token。
 
-GAS 部署後，請確認 Script Properties 或 `gas/EnvConfig.gs` 有設定：
+前端 Firebase Web API Key 請用 Vite 環境變數設定，不要寫入程式碼：
+
+```text
+VITE_FIREBASE_API_KEY
+```
+
+本機可複製 `.env.example` 為 `.env.local` 後填入；GitHub Pages / CI 部署則請在部署環境設定同名 secret 或 variable。
+
+GAS 部署後，請確認 Script Properties 有設定：
 
 ```text
 FIREBASE_WEB_API_KEY
