@@ -42,6 +42,7 @@ jobs:
         env:
           CI: false
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_GAS_SCRIPT_URL: ${{ secrets.VITE_GAS_SCRIPT_URL }}
 
       # 5. 💡 SPA 關鍵補丁：複製 index.html 為 404.html
       # 這是為了解決 GitHub Pages 重新整理時找不到路徑的問題

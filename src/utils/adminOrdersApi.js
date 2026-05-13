@@ -1,5 +1,7 @@
 import { db } from './firebase';
 import { getAdminIdToken } from './adminAuth';
+import { GAS_SCRIPT_URL } from '../config';
+import { postGasApi } from './gasApi';
 import {
   collection,
   getDocs,
@@ -13,7 +15,7 @@ import {
   where
 } from 'firebase/firestore';
 
-export const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec';
+export const SCRIPT_URL = GAS_SCRIPT_URL;
 
 export const getOrderSearchMode = (keyword) => {
   const rawKeyword = String(keyword || '').trim();
@@ -38,18 +40,7 @@ export const callGasApi = async (payload, options = {}) => {
     finalPayload.idToken = await getAdminIdToken();
   }
 
-  const response = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(finalPayload)
-  });
-
-  const result = await response.json();
-  if (result.status === 'error') {
-    throw new Error(result.message || '處理失敗');
-  }
-
-  return result;
+  return postGasApi(finalPayload);
 };
 
 export const fetchAdminSettings = async () => {

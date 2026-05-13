@@ -30,5 +30,7 @@ export default function useScrollFadeIn(dependencies = []) {
             clearTimeout(timer);
             observer.disconnect(); 
         };
+    // The caller controls when scroll-bound elements are re-scanned.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, dependencies);
 }

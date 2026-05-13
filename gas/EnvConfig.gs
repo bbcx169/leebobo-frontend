@@ -35,6 +35,7 @@ function setTelegramNotificationProperties(botToken, chatId) {
 // 🔐 權限與安全
 const ADMIN_LINE_IDS = ['U4460cd7d1f421c42d6dbf0f07253580e'];
 const FIREBASE_WEB_API_KEY = '';
+const FIREBASE_PROJECT_ID = 'leebobo-frontend';
 
 // 📁 雲端硬碟 PDF 資料夾設定
 const PDF_FOLDER_ID = '1GrWJtbw51RTZ-a0fGkrCqbiLpLgOqxH7';

@@ -8,7 +8,6 @@ import RevenueReport from '../components/Admin/RevenueReport';
 import { products } from '../constants/data';
 import { onAdminAuthStateChanged, signInAdminWithEmail, signInAdminWithGoogle, signOutAdmin } from '../utils/adminAuth';
 import {
-  SCRIPT_URL,
   deleteAdminOrder,
   fetchAdminOrdersPage,
   fetchAdminSettings,
@@ -518,7 +517,7 @@ function AdminDashboardContent() {
 
         {activeTab === 'revenue' && (
           <div className="max-w-7xl mx-auto">
-            <RevenueReport scriptUrl={SCRIPT_URL} />
+            <RevenueReport />
           </div>
         )}
 

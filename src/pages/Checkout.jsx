@@ -6,9 +6,6 @@ import useScrollFadeIn from '../hooks/useScrollFadeIn';
 import CartSummary from '../components/CartSummary';
 
 // ✨ 新增：導入 Firebase 相關方法
-import { db } from '../utils/firebase';
-import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
-
 // 💡 導入步驟子組件
 import Step1Event from '../components/checkout/Step1Event';
 import Step2Location from '../components/checkout/Step2Location';
@@ -16,27 +13,7 @@ import Step3Contact from '../components/checkout/Step3Contact';
 import Step4Confirm from '../components/checkout/Step4Confirm';
 import { formatSpecificDetails } from '../utils/orderDetails';
 import { fetchProductAvailability, normalizeProductAvailability } from '../utils/productAvailability';
-
-const GAS_SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec";
-
-const parseGasResponse = async (response) => {
-  const responseText = await response.text();
-  const trimmedText = responseText.trim();
-
-  if (!trimmedText) {
-    throw new Error("GAS returned an empty response. Please check the Apps Script deployment.");
-  }
-
-  if (trimmedText.startsWith("<")) {
-    throw new Error("GAS returned an HTML page instead of JSON. Please check the Apps Script Web App URL and access permissions.");
-  }
-
-  try {
-    return JSON.parse(trimmedText);
-  } catch (error) {
-    throw new Error(`Unable to parse GAS response: ${error.message}`);
-  }
-};
+import { postGasApi } from '../utils/gasApi';
 
 const Checkout = ({ 
   cart, 
@@ -54,7 +31,7 @@ const Checkout = ({
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({ ...initialFormData });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCheckingDate, setIsCheckingDate] = useState(false);
+  const [isCheckingDate] = useState(false);
   const [isSameAsOrderer, setIsSameAsOrderer] = useState(false);
   const [productAvailability, setProductAvailability] = useState(() => normalizeProductAvailability());
 
@@ -263,61 +240,39 @@ const Checkout = ({
     };
 
     try {
-      setSubmitMsg("正在將訂單安全地寫入資料庫中...");
-      
-      // ✨ 步驟 1：將訂單存入 Firebase Firestore
-      const ordersRef = collection(db, "orders");
-      const docRef = await addDoc(ordersRef, payload);
-      const firestoreDocumentId = docRef.id;
+      setSubmitMsg("正在建立訂單、產生 PDF 並同步報表...");
 
-      setSubmitMsg("正在為您生成專屬 PDF 訂單明細與發送通知...");
-
-      // ✨ 步驟 2：呼叫 GAS 微服務產 PDF 及通知
-      const gasPayload = { ...payload, action: 'create_order', firestoreDocumentId }; 
+      const gasPayload = { ...payload, action: 'create_order' };
       let finalPdfUrl = "";
+      let firestoreDocumentId = "";
       
       try {
-        const response = await fetch(GAS_SCRIPT_URL, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
-        body: JSON.stringify(gasPayload) 
-        });
-        const result = await parseGasResponse(response);
+        const result = await postGasApi(gasPayload);
 
         if (!['success', 'partial_success'].includes(result.status)) {
-          throw new Error(result.message || "GAS did not finish PDF generation.");
+          throw new Error(result.message || "GAS did not finish order creation.");
         }
-        // ✨ 步驟 3：GAS 成功產出 PDF，將網址更新回 Firebase 訂單中
-        finalPdfUrl = result.pdfDownloadUrl || "";
-        const orderDocToUpdate = doc(db, "orders", firestoreDocumentId);
-        await updateDoc(orderDocToUpdate, {
-          pdfDownloadUrl: finalPdfUrl,
-          sheetSynced: result.sheetSynced === true,
-          sheetSyncError: result.sheetError || ''
-        });
 
-        if (result.sheetSynced === false) {
+        finalPdfUrl = result.pdfDownloadUrl || "";
+        firestoreDocumentId = result.firestoreDocumentId || "";
+
+        if (result.status === 'partial_success') {
           setAlertMsg([
-            "訂單已成立，但 Google Sheets 報表暫時沒有同步成功。",
-            "請不要重複送出訂單；Firebase 與 PDF 已保留這筆訂單。",
+            "訂單已成立，但部分後端服務暫時沒有完成。",
+            "請不要重複送出訂單；Firestore 與 PDF 已保留這筆訂單。",
             `訂單編號：${payload.orderNumber}`,
-            `技術訊息：${result.sheetError || 'GAS 未回傳詳細錯誤'}`
+            `技術訊息：${result.sheetError || result.notificationError || result.firestoreStatusError || 'GAS 未回傳詳細錯誤'}`
           ]);
         }
 
         // 成功，觸發完成畫面
       } catch (gasError) {
-        console.warn("Order was saved, but GAS PDF/notification failed:", gasError);
-        setAlertMsg([
-          "訂單已成立，但 PDF/通知服務暫時沒有完成。",
-          "請不要重複送出訂單；店家仍可在後台看到這筆訂單。",
-          `訂單編號：${payload.orderNumber}`,
-          `技術訊息：${gasError.message}`
-        ]);
+        console.warn("GAS order creation failed:", gasError);
+        throw gasError;
       }
 
       onOrderSuccess({ 
-        payload, 
+        payload: { ...payload, pdfDownloadUrl: finalPdfUrl },
         firestoreDocumentId,
         orderNumber: payload.orderNumber, 
         cart: { ...availableCart }, 

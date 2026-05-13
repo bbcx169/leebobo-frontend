@@ -2,57 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { products } from '../constants/data';
 import useScrollFadeIn from '../hooks/useScrollFadeIn';
 import OrderReceipt from '../components/OrderReceipt';
+import { sendGasRequestWithNoCorsFallback } from '../utils/gasApi';
 
 // ✨ 新增 Firebase 相關引入
 import { db } from '../utils/firebase';
 import { collection, query, where, getDocs, doc as firestoreDoc, updateDoc } from 'firebase/firestore';
 
-// 💡 寄送 Email 還是需要 GAS 微服務，所以保留 SCRIPT_URL
-const SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec";
-
-const parseGasResponse = async (response) => {
-  const responseText = await response.text();
-  const trimmedText = responseText.trim();
-
-  if (!trimmedText) {
-    throw new Error("GAS 回傳空白內容，請確認 Apps Script 部署狀態。");
-  }
-
-  if (trimmedText.startsWith("<")) {
-    throw new Error("GAS 回傳 HTML 頁面，不是 JSON。請確認 Apps Script Web App URL 與存取權限。");
-  }
-
-  try {
-    return JSON.parse(trimmedText);
-  } catch (error) {
-    throw new Error(`GAS 回傳內容無法解析：${error.message}`);
-  }
-};
-
 const sendGasRequest = async (payload) => {
-  try {
-    const response = await fetch(SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-
-    return await parseGasResponse(response);
-  } catch (error) {
-    console.warn("Readable GAS request failed, retrying as no-cors:", error);
-
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-
-    return {
-      status: 'success',
-      message: '補發請求已送出，請稍後確認信箱。'
-    };
-  }
+  return sendGasRequestWithNoCorsFallback(payload, '補發請求已送出，請稍後確認信箱。');
 };
 
 const getTimestampValue = (value) => {

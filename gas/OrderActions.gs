@@ -115,6 +115,23 @@ function handleCreateOrder(data) {
     pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     const directUrl = `https://drive.google.com/uc?export=download&id=${pdfFile.getId()}`;
 
+    const orderData = Object.assign({}, data, {
+      action: undefined,
+      idToken: undefined,
+      pdfDownloadUrl: directUrl,
+      sheetSynced: false,
+      sheetSyncError: '',
+      notificationSent: false,
+      notificationError: '',
+      isModified: data.isModified === true,
+      createdAt: Number(data.createdAt) || new Date().getTime()
+    });
+    const firestoreDocument = createFirestoreOrder(orderData);
+    data.firestoreDocumentId = firestoreDocument.id;
+    data.firestoreId = firestoreDocument.id;
+    data.pdfDownloadUrl = directUrl;
+    data.createdAt = orderData.createdAt;
+
     let sheetSynced = false;
     let sheetError = "";
     let sheetUrl = "";
@@ -127,34 +144,67 @@ function handleCreateOrder(data) {
       Logger.log("Order report sync failed for " + data.orderNumber + ": " + sheetError);
     }
 
-    const messageContent = `🍡【新訂單通知】\n編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日：${data.eventDate} ${data.eventTime}\n報表同步：${sheetSynced ? '成功' : '失敗'}\n[PDF連結]：\n${directUrl}`;
-    sendMerchantNotification(messageContent);
-
-    if (typeof NOTIFY_EMAIL !== "undefined" && NOTIFY_EMAIL) {
-      MailApp.sendEmail({
-        to: NOTIFY_EMAIL, subject: `【系統通知】收到新訂單 - 編號 ${data.orderNumber}`,
-        body: `您好，系統已收到一筆新訂單。\n\n訂單編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日期：${data.eventDate} ${data.eventTime}\n報表同步：${sheetSynced ? '成功' : '失敗'}${sheetError ? `\n同步錯誤：${sheetError}` : ''}\n\n詳情明細請參閱附件 PDF。`,
-        attachments: [pdfBlob]
+    let firestoreStatusError = "";
+    try {
+      updateFirestoreOrder(firestoreDocument.id, {
+        sheetSynced: sheetSynced,
+        sheetSyncError: sheetError
       });
+    } catch (firestoreUpdateErr) {
+      firestoreStatusError = firestoreUpdateErr.toString();
+      Logger.log("Firestore sheet status update failed for " + data.orderNumber + ": " + firestoreStatusError);
     }
 
-    if (data.ordererEmail && data.ordererEmail !== '未提供') {
-      const customerContent = `親愛的顧客您好：\n\n感謝您預約「李伯伯糖葫蘆」！我們已收到您的訂單（編號：${data.orderNumber}）。\n附件為您的訂單明細 PDF 檔，請您核對內容是否正確。\n\n請務必加入 LINE 官方帳號留言，後續我們將由專人與您聯繫確認細節。若有任何疑問，歡迎隨時聯繫 LINE 官方帳號。\n期待在您的活動現場為您服務！\n\n李伯伯糖葫蘆 敬上`;
+    let notificationError = "";
+    try {
+      const messageContent = `🍡【新訂單通知】\n編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日：${data.eventDate} ${data.eventTime}\n報表同步：${sheetSynced ? '成功' : '失敗'}\n[PDF連結]：\n${directUrl}`;
+      sendMerchantNotification(messageContent);
 
-      MailApp.sendEmail({
-        to: data.ordererEmail,
-        subject: `【訂單明細】李伯伯糖葫蘆 - 訂單編號 ${data.orderNumber}`,
-        body: customerContent,
-        attachments: [pdfBlob]
+      if (typeof NOTIFY_EMAIL !== "undefined" && NOTIFY_EMAIL) {
+        MailApp.sendEmail({
+          to: NOTIFY_EMAIL, subject: `【系統通知】收到新訂單 - 編號 ${data.orderNumber}`,
+          body: `您好，系統已收到一筆新訂單。\n\n訂單編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日期：${data.eventDate} ${data.eventTime}\n報表同步：${sheetSynced ? '成功' : '失敗'}${sheetError ? `\n同步錯誤：${sheetError}` : ''}\n\n詳情明細請參閱附件 PDF。`,
+          attachments: [pdfBlob]
+        });
+      }
+
+      if (data.ordererEmail && data.ordererEmail !== '未提供') {
+        const customerContent = `親愛的顧客您好：\n\n感謝您預約「李伯伯糖葫蘆」！我們已收到您的訂單（編號：${data.orderNumber}）。\n附件為您的訂單明細 PDF 檔，請您核對內容是否正確。\n\n請務必加入 LINE 官方帳號留言，後續我們將由專人與您聯繫確認細節。若有任何疑問，歡迎隨時聯繫 LINE 官方帳號。\n期待在您的活動現場為您服務！\n\n李伯伯糖葫蘆 敬上`;
+
+        MailApp.sendEmail({
+          to: data.ordererEmail,
+          subject: `【訂單明細】李伯伯糖葫蘆 - 訂單編號 ${data.orderNumber}`,
+          body: customerContent,
+          attachments: [pdfBlob]
+        });
+      }
+    } catch (notifyErr) {
+      notificationError = notifyErr.toString();
+      Logger.log("Order notification failed for " + data.orderNumber + ": " + notificationError);
+    }
+
+    try {
+      updateFirestoreOrder(firestoreDocument.id, {
+        notificationSent: notificationError === '',
+        notificationError: notificationError
       });
+    } catch (firestoreNotifyUpdateErr) {
+      firestoreStatusError = [firestoreStatusError, firestoreNotifyUpdateErr.toString()]
+        .filter(Boolean)
+        .join(' | ');
+      Logger.log("Firestore notification status update failed for " + data.orderNumber + ": " + firestoreNotifyUpdateErr.toString());
     }
 
     return jsonResponse({
-      status: 'success',
+      status: sheetSynced && !notificationError && !firestoreStatusError ? 'success' : 'partial_success',
+      firestoreDocumentId: firestoreDocument.id,
       pdfDownloadUrl: directUrl,
       sheetSynced: sheetSynced,
       sheetError: sheetError,
-      sheetUrl: sheetUrl
+      sheetUrl: sheetUrl,
+      notificationSent: notificationError === '',
+      notificationError: notificationError,
+      firestoreStatusError: firestoreStatusError
     });
   } finally {
     try {

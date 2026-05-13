@@ -5,52 +5,10 @@ import OrderReceipt from '../components/OrderReceipt';
 import { products } from '../constants/data'; 
 import { db } from '../utils/firebase';
 import { doc as firestoreDoc, updateDoc } from 'firebase/firestore';
-
-const GAS_SCRIPT_URL = import.meta.env.VITE_GAS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbwMv1kSK35ZeMNLeH5Do7vHj8YzRkGhyovRT11LVcQSz8ZJZUwT7LZN10DeajhDh6Jgzw/exec";
-
-const parseGasResponse = async (response) => {
-  const responseText = await response.text();
-  const trimmedText = responseText.trim();
-
-  if (!trimmedText) {
-    throw new Error("GAS returned an empty response. Please check the Apps Script deployment.");
-  }
-
-  if (trimmedText.startsWith("<")) {
-    throw new Error("GAS returned an HTML page instead of JSON. Please check the Apps Script Web App URL and access permissions.");
-  }
-
-  try {
-    return JSON.parse(trimmedText);
-  } catch (error) {
-    throw new Error(`Unable to parse GAS response: ${error.message}`);
-  }
-};
+import { sendGasRequestWithNoCorsFallback } from '../utils/gasApi';
 
 const sendGasRequest = async (payload) => {
-  try {
-    const response = await fetch(GAS_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-
-    return await parseGasResponse(response);
-  } catch (error) {
-    console.warn("Readable GAS request failed, retrying as no-cors:", error);
-
-    await fetch(GAS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-
-    return {
-      status: 'success',
-      message: '補發請求已送出，請稍後確認信箱。'
-    };
-  }
+  return sendGasRequestWithNoCorsFallback(payload, '補發請求已送出，請稍後確認信箱。');
 };
 
 const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
@@ -100,10 +58,6 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
     setEmailErrMsg('');
 
     try {
-      if (!GAS_SCRIPT_URL) {
-        throw new Error("GAS Web App URL is not configured.");
-      }
-
       const result = await sendGasRequest({
         ...submittedOrder.payload,
         action: 'resendPdf',

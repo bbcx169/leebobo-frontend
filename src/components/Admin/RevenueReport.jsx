@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 // ✨ 1. 引入 Firebase 相關方法
 import { db } from '../../utils/firebase';
 import { collection, getDocs } from 'firebase/firestore';
@@ -33,7 +33,7 @@ export default function RevenueReport() {
   // ==========================================
   // 2. ✨ 從 Firebase 取得資料並在前端計算報表
   // ==========================================
-  const fetchReport = async (month) => {
+  const fetchReport = useCallback(async (month) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -93,18 +93,17 @@ export default function RevenueReport() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // 初始載入
   useEffect(() => {
     fetchReport(targetMonth);
-  }, []);
+  }, [fetchReport, targetMonth]);
 
   // 處理月份變更
   const handleMonthChange = (e) => {
     const newMonth = e.target.value;
     setTargetMonth(newMonth);
-    fetchReport(newMonth);
   };
 
   // ==========================================

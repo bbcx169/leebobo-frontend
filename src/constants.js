@@ -1,4 +1,4 @@
-export const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzf8kJ6Ka8yGabg--MCRJ8eyucBbsGRDbceGEeH-CQDLqOMXhTCysZVrPKL0MLpSg4L/exec';
+export { GAS_SCRIPT_URL as SCRIPT_URL } from './config';
 
 export const products = [
   { id: 1, name: '蕃茄 (小/喜糖)', price: 20, tags: ['婚禮小物', '小巧可愛'], description: '飽滿紅番茄裹上晶瑩糖漿，這份「永結同心」糖葫蘆，將甜蜜祝福封存。紅心貼紙耀眼奪目，寓意新人幸福圓滿。願每一對新人愛情如蜜，永結同心。', image: 'https://lh3.googleusercontent.com/d/1wKiFdk5B--qTiH3W6oMMXNr3C7iJpvM5?auto=format&fit=crop&q=80&w=400' },

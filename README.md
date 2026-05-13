@@ -55,7 +55,6 @@ src/
   components/
     Admin/                        # 後台表格、統計、Modal
     checkout/                     # 結帳步驟元件
-    _archive/                     # 舊版或未引用元件封存
   utils/
     firebase.js                   # Firebase 初始化
     adminOrdersApi.js             # 後台 Firestore / GAS API 封裝
@@ -67,13 +66,13 @@ gas/
   AuthService.gs                  # Firebase admin ID token / custom claim 驗證
   OrderActions.gs                 # create_order / update_pdf / resend / delete action 實作
   DrivePdfService.gs              # Drive PDF 查找與檔案 ID 工具
+  FirestoreService.gs             # Firestore REST API 寫入
   OrderReportService.gs           # Google Sheets 訂單報表同步
   NotificationService.gs          # LINE / Telegram 通知
   SettingsService.gs              # 後台提醒設定
-  EnvConfig.gs / EnvConfig.js     # GAS 環境變數與常數
-  PdfService.gs / PdfService.js   # PDF 產生邏輯
+  EnvConfig.gs                    # GAS 環境變數與常數
+  PdfService.gs                   # PDF 產生邏輯
   PdfTemplate.html                # PDF HTML 模板
-  _archive/                       # 歷史封存檔案，不得作為部署來源
 ```
 
 ## 本機開發
@@ -154,7 +153,7 @@ firestore.indexes.json
 
 後台已改用 Firebase Auth + custom claims 判斷管理員權限。Firestore rules 目前收斂為：
 
-- 前台仍可直接建立訂單。
+- 前台不可直接建立訂單；訂單建立由 GAS `create_order` 代寫 Firestore。
 - 前台僅可補寫 `pdfDownloadUrl` / `sheetSynced` / `sheetSyncError`。
 - 後台修改與刪除訂單需 `request.auth.token.admin == true`。
 - 商品上下架設定前台可讀，只有 admin 可寫。
@@ -223,6 +222,7 @@ GAS 高風險 action 已要求 Firebase admin ID token：
 
 ```text
 VITE_FIREBASE_API_KEY
+VITE_GAS_SCRIPT_URL
 ```
 
 本機可複製 `.env.example` 為 `.env.local` 後填入；GitHub Pages / CI 部署則請在部署環境設定同名 secret 或 variable。
@@ -231,19 +231,20 @@ GAS 部署後，請確認 Script Properties 有設定：
 
 ```text
 FIREBASE_WEB_API_KEY
+FIREBASE_PROJECT_ID
 ```
 
 後續安全收斂方向：
 
-1. 前台建立訂單改由 GAS 或 Cloud Functions 代寫 Firestore
-2. 訂單查詢改由受控 API 執行，移除 `orders` 公開讀取
-3. 後台 Firestore 寫入改由 GAS / Cloud Functions 代寫
+1. 訂單查詢改由受控 API 執行，移除 `orders` 公開讀取
+2. 後台 Firestore 寫入改由 GAS / Cloud Functions 代寫
 
 ## Google Apps Script
 
 GAS API 主要負責：
 
 - 驗證後台管理員
+- 建立 Firestore 訂單
 - 建立訂單 PDF
 - 寄送 Email
 - 同步 Google Sheets 訂單報表
@@ -251,27 +252,28 @@ GAS API 主要負責：
 - 儲存 LINE 提醒設定
 - 推送 LINE / Telegram / Email 通知
 
-前端目前使用的 GAS Web App URL 定義於：
+前端使用的 GAS Web App URL 由 Vite 環境變數集中管理：
 
 ```text
-src/utils/adminOrdersApi.js
-src/pages/Checkout.jsx
+VITE_GAS_SCRIPT_URL
+src/config.js
 ```
 
-正式環境建議統一改由環境變數管理，避免同一 URL 分散在多個檔案。
+正式環境需在 GitHub Actions secrets 設定 `VITE_GAS_SCRIPT_URL`，程式碼不得硬編碼 Web App URL。
 
 ### GAS 部署注意事項
 
 修改 `gas/` 內檔案後，必須重新部署 Apps Script Web App，前端才會打到新版邏輯。
 
-`gas/` 目錄是 GAS API 的正式維護來源；`Api.gs` 只保留 Web App 入口與 action routing。`gas/_archive/Api.legacy.js` 僅供歷史參考，不得部署，也不需要同步修改。
+`gas/` 目錄是 GAS API 的正式維護來源；`Api.gs` 只保留 Web App 入口與 action routing。正式 GAS 程式碼只保留 `.gs` 檔，避免 `.js` 備份與 `.gs` 版本不同步。
 
 本專案已移除 clasp 專案綁定與登入設定，不再透過 clasp push/deploy 維護 GAS。更新 GAS 時，請手動將 `gas/` 內對應檔案內容同步到 Apps Script 編輯器，或另行建立明確的部署流程。
 
 常見需要確認的 GAS Script Properties：
 
 ```text
-ADMIN_PASSWORD
+FIREBASE_PROJECT_ID
+FIREBASE_WEB_API_KEY
 LINE_CHANNEL_ACCESS_TOKEN
 LINE_ADMIN_USER_ID
 TELEGRAM_BOT_TOKEN
@@ -289,11 +291,12 @@ reminderTime
 
 新訂單建立時，前端會：
 
-1. 寫入 Firestore `orders`
-2. 呼叫 GAS `create_order`
-3. GAS 產生 PDF
+1. 呼叫 GAS `create_order`
+2. GAS 產生 PDF
+3. GAS 建立 Firestore `orders` 文件
 4. GAS upsert Google Sheets 訂單報表列
-5. Firestore 回寫 PDF URL 與 Sheets 同步狀態
+5. GAS 回寫 Sheets / notification 同步狀態到 Firestore
+6. GAS 推送 LINE / Telegram / Email 通知
 
 後台刪除訂單時，流程為：
 
@@ -339,10 +342,8 @@ settings/productAvailability
 
 ## 已知維護重點
 
-- `gas/` 目錄是 GAS API 正式維護來源；`gas/_archive/Api.legacy.js` 僅保留歷史參考。
+- `gas/` 目錄是 GAS API 正式維護來源；正式 GAS 程式碼只保留 `.gs` 檔。
 - 前端有部分文字因歷史編碼問題呈現亂碼，功能未必受影響，但後續應逐步清理。
-- 舊版 `OrderForm` 已封存於 `src/components/_archive/OrderForm.legacy.jsx`，待專案運作穩定後再評估移除。
-- GAS URL 與 Firebase config 目前寫在程式碼內，正式維運建議集中到環境變數或設定檔。
 
 ## 部署檢查清單
 
