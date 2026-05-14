@@ -25,6 +25,51 @@ function findOrderPdfFile(data) {
   return fuzzyFiles.hasNext() ? fuzzyFiles.next() : null;
 }
 
+function createOrderPdfFile(pdfBlob) {
+  const fileName = pdfBlob.getName() || '李伯伯糖葫蘆_訂單明細.pdf';
+  const file = Drive.Files.insert(
+    {
+      title: fileName,
+      mimeType: 'application/pdf',
+      parents: [{ id: PDF_FOLDER_ID }]
+    },
+    pdfBlob,
+    {
+      supportsAllDrives: true
+    }
+  );
+
+  Drive.Permissions.insert(
+    {
+      role: 'reader',
+      type: 'anyone',
+      value: ''
+    },
+    file.id,
+    {
+      supportsAllDrives: true
+    }
+  );
+
+  return {
+    id: file.id,
+    url: `https://drive.google.com/uc?export=download&id=${file.id}`
+  };
+}
+
+function trashOrderPdfFiles(orderNumber) {
+  const escapedOrderNumber = escapeDriveQueryValue(orderNumber);
+  const response = Drive.Files.list({
+    q: `'${PDF_FOLDER_ID}' in parents and title contains '${escapedOrderNumber}' and mimeType = 'application/pdf' and trashed = false`,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true
+  });
+
+  (response.items || []).forEach(function(file) {
+    Drive.Files.trash(file.id, { supportsAllDrives: true });
+  });
+}
+
 function extractDriveFileId(url) {
   if (!url) return "";
   const text = String(url);

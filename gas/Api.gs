@@ -52,6 +52,7 @@ function doPost(e) {
         return jsonResponse({ status: 'error', message: `未知的操作指令: ${data.action}` });
     }
   } catch (error) {
+    Logger.log(error && error.stack ? error.stack : error.toString());
     return jsonResponse({ status: 'error', message: error.toString() });
   }
 }

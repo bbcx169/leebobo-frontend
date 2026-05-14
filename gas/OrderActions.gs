@@ -26,10 +26,8 @@ function handleResendPdf(data) {
       }
 
       blob = PdfService.generateOrderPdfBlob(data);
-      const folder = DriveApp.getFolderById(PDF_FOLDER_ID);
-      file = folder.createFile(blob);
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      directUrl = `https://drive.google.com/uc?export=download&id=${file.getId()}`;
+      const createdPdf = createOrderPdfFile(blob);
+      directUrl = createdPdf.url;
     }
 
     const customerMsg = `親愛的顧客您好：\n\n這是「李伯伯糖葫蘆」補發的訂單明細。\n訂單編號：${data.orderNumber}\n\n附件為您的訂單 PDF 檔，請查收。\n\n李伯伯糖葫蘆 敬上`;
@@ -55,17 +53,9 @@ function handleResendPdf(data) {
 function handleUpdatePdf(data) {
   try {
     const pdfBlob = PdfService.generateOrderPdfBlob(data);
-    const folder = DriveApp.getFolderById(PDF_FOLDER_ID);
-
-    const oldFileName = `李伯伯糖葫蘆_訂單明細_${data.orderNumber}.pdf`;
-    const oldFiles = folder.searchFiles(`title = '${oldFileName}'`);
-    while (oldFiles.hasNext()) {
-      oldFiles.next().setTrashed(true);
-    }
-
-    const pdfFile = folder.createFile(pdfBlob);
-    pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    const directUrl = `https://drive.google.com/uc?export=download&id=${pdfFile.getId()}`;
+    trashOrderPdfFiles(data.orderNumber);
+    const createdPdf = createOrderPdfFile(pdfBlob);
+    const directUrl = createdPdf.url;
 
     if (data.ordererEmail && data.ordererEmail !== '未提供') {
       const modifyMsg = `親愛的顧客您好：\n\n您的訂單（編號：${data.orderNumber}）資訊已由管理員完成修改。\n修改內容可能包含活動日期、時間、配送地點或備註。\n附件為更新後的訂單明細 PDF，請您重新查收。如有任何疑問，歡迎聯繫 LINE 客服。\n\n李伯伯糖葫蘆 敬上`;
@@ -106,14 +96,16 @@ function handleMarkOrderDeleted(data) {
 
 function handleCreateOrder(data) {
   const orderLock = LockService.getScriptLock();
+  const orderNumber = data && data.orderNumber ? data.orderNumber : 'unknown';
   try {
+    Logger.log("create_order start: " + orderNumber);
     orderLock.waitLock(10000);
 
+    Logger.log("create_order generate_pdf: " + orderNumber);
     const pdfBlob = PdfService.generateOrderPdfBlob(data);
-    const folder = DriveApp.getFolderById(PDF_FOLDER_ID);
-    const pdfFile = folder.createFile(pdfBlob);
-    pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    const directUrl = `https://drive.google.com/uc?export=download&id=${pdfFile.getId()}`;
+    Logger.log("create_order save_pdf_to_drive: " + orderNumber);
+    const createdPdf = createOrderPdfFile(pdfBlob);
+    const directUrl = createdPdf.url;
 
     const orderData = Object.assign({}, data, {
       action: undefined,
@@ -126,6 +118,7 @@ function handleCreateOrder(data) {
       isModified: data.isModified === true,
       createdAt: Number(data.createdAt) || new Date().getTime()
     });
+    Logger.log("create_order create_firestore_order: " + orderNumber);
     const firestoreDocument = createFirestoreOrder(orderData);
     data.firestoreDocumentId = firestoreDocument.id;
     data.firestoreId = firestoreDocument.id;
@@ -136,6 +129,7 @@ function handleCreateOrder(data) {
     let sheetError = "";
     let sheetUrl = "";
     try {
+      Logger.log("create_order sync_sheet: " + orderNumber);
       const sheetResult = upsertOrderReportRow(data, directUrl);
       sheetSynced = sheetResult.synced;
       sheetUrl = sheetResult.spreadsheetUrl;
@@ -146,6 +140,7 @@ function handleCreateOrder(data) {
 
     let firestoreStatusError = "";
     try {
+      Logger.log("create_order update_firestore_sheet_status: " + orderNumber);
       updateFirestoreOrder(firestoreDocument.id, {
         sheetSynced: sheetSynced,
         sheetSyncError: sheetError
@@ -157,6 +152,7 @@ function handleCreateOrder(data) {
 
     let notificationError = "";
     try {
+      Logger.log("create_order send_notifications: " + orderNumber);
       const messageContent = `🍡【新訂單通知】\n編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日：${data.eventDate} ${data.eventTime}\n報表同步：${sheetSynced ? '成功' : '失敗'}\n[PDF連結]：\n${directUrl}`;
       sendMerchantNotification(messageContent);
 
@@ -184,6 +180,7 @@ function handleCreateOrder(data) {
     }
 
     try {
+      Logger.log("create_order update_firestore_notification_status: " + orderNumber);
       updateFirestoreOrder(firestoreDocument.id, {
         notificationSent: notificationError === '',
         notificationError: notificationError
@@ -195,6 +192,7 @@ function handleCreateOrder(data) {
       Logger.log("Firestore notification status update failed for " + data.orderNumber + ": " + firestoreNotifyUpdateErr.toString());
     }
 
+    Logger.log("create_order done: " + orderNumber);
     return jsonResponse({
       status: sheetSynced && !notificationError && !firestoreStatusError ? 'success' : 'partial_success',
       firestoreDocumentId: firestoreDocument.id,
