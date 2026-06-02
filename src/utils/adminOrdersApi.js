@@ -151,12 +151,12 @@ export const saveAdminSettings = async (settings) => {
 
 export const fetchNotificationSettings = async () => {
   const result = await callGasApi({ action: 'get_notification_settings' });
-  return result.data;
+  return normalizeNotificationSettingsForClient(result.data);
 };
 
 export const saveNotificationSettings = async (settings) => {
   const result = await callGasApi({ action: 'save_notification_settings', settings });
-  return result.data;
+  return normalizeNotificationSettingsForClient(result.data);
 };
 
 export const sendTestNotification = async ({ recipientId, channel }) => {
@@ -168,3 +168,42 @@ export const fetchNotificationLogs = async () => {
   const result = await callGasApi({ action: 'get_notification_logs', limit: 50 });
   return result.data || [];
 };
+
+const maskContactValue = (value = '') => {
+  const cleanValue = String(value || '').trim();
+  if (!cleanValue) return '';
+  if (cleanValue.includes('@')) {
+    const [name, domain] = cleanValue.split('@');
+    return `${name.slice(0, 2)}***@${domain || ''}`;
+  }
+  if (cleanValue.length <= 8) return '***';
+  return `${cleanValue.slice(0, 4)}***${cleanValue.slice(-4)}`;
+};
+
+const normalizeNotificationSettingsForClient = (settings = {}) => ({
+  ...settings,
+  recipients: (settings.recipients || []).map(recipient => {
+    const rawEmail = String(recipient.email || '').trim();
+    const rawLineUserId = String(recipient.lineUserId || '').trim();
+    const rawTelegramChatId = String(recipient.telegramChatId || '').trim();
+    const hasEmail = recipient.hasEmail === true || Boolean(rawEmail || recipient.emailMasked);
+    const hasLineUserId = recipient.hasLineUserId === true || Boolean(rawLineUserId || recipient.lineUserIdMasked);
+    const hasTelegramChatId = recipient.hasTelegramChatId === true || Boolean(rawTelegramChatId || recipient.telegramChatIdMasked);
+
+    return {
+      ...recipient,
+      email: '',
+      lineUserId: '',
+      telegramChatId: '',
+      hasEmail,
+      hasLineUserId,
+      hasTelegramChatId,
+      emailMasked: recipient.emailMasked || maskContactValue(rawEmail),
+      lineUserIdMasked: recipient.lineUserIdMasked || maskContactValue(rawLineUserId),
+      telegramChatIdMasked: recipient.telegramChatIdMasked || maskContactValue(rawTelegramChatId),
+      clearEmail: false,
+      clearLineUserId: false,
+      clearTelegramChatId: false
+    };
+  })
+});
