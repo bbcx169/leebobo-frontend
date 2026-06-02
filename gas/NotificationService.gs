@@ -209,7 +209,9 @@ function sendNotificationChannel(channel, target, subject, messageText, attachme
   }
 
   if (channel === 'telegram') {
-    sendTelegramMessageToChat(messageText, target);
+    splitNotificationTargets(target).forEach(function(targetChatId) {
+      sendTelegramMessageToChat(messageText, targetChatId);
+    });
     return;
   }
 
@@ -486,6 +488,13 @@ function getRecipientTarget(recipient, channel) {
   if (channel === 'line') return String(recipient.lineUserId || '').trim();
   if (channel === 'telegram') return String(recipient.telegramChatId || '').trim();
   return '';
+}
+
+function splitNotificationTargets(target) {
+  return String(target || '')
+    .split(/[,\n]/)
+    .map(function(item) { return item.trim(); })
+    .filter(function(item) { return item; });
 }
 
 function getNotificationEventDefinition(eventKey) {
