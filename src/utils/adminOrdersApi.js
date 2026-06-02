@@ -148,3 +148,23 @@ export const deleteAdminOrder = async ({ order }) => {
 export const saveAdminSettings = async (settings) => {
   return callGasApi({ action: 'save_settings', ...settings });
 };
+
+export const fetchNotificationSettings = async () => {
+  const result = await callGasApi({ action: 'get_notification_settings' });
+  return result.data;
+};
+
+export const saveNotificationSettings = async (settings) => {
+  const result = await callGasApi({ action: 'save_notification_settings', settings });
+  return result.data;
+};
+
+export const sendTestNotification = async ({ recipientId, channel }) => {
+  const result = await callGasApi({ action: 'test_notification', recipientId, channel });
+  return result.data;
+};
+
+export const fetchNotificationLogs = async () => {
+  const result = await callGasApi({ action: 'get_notification_logs', limit: 50 });
+  return result.data || [];
+};

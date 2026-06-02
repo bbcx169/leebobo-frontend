@@ -17,7 +17,11 @@ const ADMIN_ACTIONS = [
   'admin_resend_pdf',
   'update_pdf',
   'mark_order_deleted',
-  'save_settings'
+  'save_settings',
+  'get_notification_settings',
+  'save_notification_settings',
+  'test_notification',
+  'get_notification_logs'
 ];
 
 function doPost(e) {
@@ -34,6 +38,18 @@ function doPost(e) {
 
       case 'save_settings':
         return handleSaveSettings(data);
+
+      case 'get_notification_settings':
+        return jsonResponse({ status: 'success', data: getNotificationSettings() });
+
+      case 'save_notification_settings':
+        return handleSaveNotificationSettings(data);
+
+      case 'test_notification':
+        return handleTestNotification(data);
+
+      case 'get_notification_logs':
+        return jsonResponse({ status: 'success', data: getNotificationLogs(data.limit || 50) });
 
       case 'admin_resend_pdf':
       case 'resendPdf':
@@ -71,6 +87,22 @@ function handleSaveSettings(data) {
   try {
     const settings = saveAdminSettings(data);
     return jsonResponse({ status: 'success', data: settings });
+  } catch (err) {
+    return jsonResponse({ status: 'error', message: err.toString() });
+  }
+}
+
+function handleSaveNotificationSettings(data) {
+  try {
+    return jsonResponse({ status: 'success', data: saveNotificationSettings(data.settings || data) });
+  } catch (err) {
+    return jsonResponse({ status: 'error', message: err.toString() });
+  }
+}
+
+function handleTestNotification(data) {
+  try {
+    return jsonResponse({ status: 'success', data: sendTestNotification(data) });
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
   }

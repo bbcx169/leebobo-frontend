@@ -38,6 +38,10 @@ function handleResendPdf(data) {
       attachments: [blob]
     });
 
+    dispatchAdminNotification('resendPdf', `訂單 PDF 已補寄。\n訂單編號：${data.orderNumber}\n收件 Email：${data.email}`, {
+      subject: `【系統通知】訂單 PDF 已補寄 - 編號 ${data.orderNumber}`
+    });
+
     return jsonResponse({ status: 'success', pdfDownloadUrl: directUrl });
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
@@ -68,6 +72,11 @@ function handleUpdatePdf(data) {
       });
     }
 
+    dispatchAdminNotification('orderUpdated', `訂單已由管理員修改並重產 PDF。\n訂單編號：${data.orderNumber}\n活動日期：${data.eventDate || ''} ${data.eventTime || ''}`, {
+      subject: `【系統通知】訂單已修改 - 編號 ${data.orderNumber}`,
+      attachments: [pdfBlob]
+    });
+
     return jsonResponse({
       status: 'success',
       pdfDownloadUrl: directUrl
@@ -82,6 +91,9 @@ function handleMarkOrderDeleted(data) {
   try {
     deleteLock.waitLock(10000);
     const result = markOrderReportRowDeleted(data);
+    dispatchAdminNotification('orderDeleted', `訂單已由管理員刪除。\n訂單編號：${data.orderNumber || ''}`, {
+      subject: `【系統通知】訂單已刪除 - 編號 ${data.orderNumber || ''}`
+    });
     return jsonResponse({ status: 'success', ...result });
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
@@ -136,6 +148,9 @@ function handleCreateOrder(data) {
     } catch (sheetErr) {
       sheetError = sheetErr.toString();
       Logger.log("Order report sync failed for " + data.orderNumber + ": " + sheetError);
+      dispatchAdminNotification('sheetSyncFailed', `訂單報表同步失敗。\n訂單編號：${data.orderNumber}\n錯誤：${sheetError}`, {
+        subject: `【系統警示】訂單報表同步失敗 - 編號 ${data.orderNumber}`
+      });
     }
 
     let firestoreStatusError = "";
@@ -154,15 +169,10 @@ function handleCreateOrder(data) {
     try {
       Logger.log("create_order send_notifications: " + orderNumber);
       const messageContent = `🍡【新訂單通知】\n編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日：${data.eventDate} ${data.eventTime}\n報表同步：${sheetSynced ? '成功' : '失敗'}\n[PDF連結]：\n${directUrl}`;
-      sendMerchantNotification(messageContent);
-
-      if (typeof NOTIFY_EMAIL !== "undefined" && NOTIFY_EMAIL) {
-        MailApp.sendEmail({
-          to: NOTIFY_EMAIL, subject: `【系統通知】收到新訂單 - 編號 ${data.orderNumber}`,
-          body: `您好，系統已收到一筆新訂單。\n\n訂單編號：${data.orderNumber}\n訂購人：${data.ordererName}\n活動日期：${data.eventDate} ${data.eventTime}\n報表同步：${sheetSynced ? '成功' : '失敗'}${sheetError ? `\n同步錯誤：${sheetError}` : ''}\n\n詳情明細請參閱附件 PDF。`,
-          attachments: [pdfBlob]
-        });
-      }
+      sendMerchantNotification(messageContent, {
+        subject: `【系統通知】收到新訂單 - 編號 ${data.orderNumber}`,
+        attachments: [pdfBlob]
+      });
 
       if (data.ordererEmail && data.ordererEmail !== '未提供') {
         const customerContent = `親愛的顧客您好：\n\n感謝您預約「李伯伯糖葫蘆」！我們已收到您的訂單（編號：${data.orderNumber}）。\n附件為您的訂單明細 PDF 檔，請您核對內容是否正確。\n\n請務必加入 LINE 官方帳號留言，後續我們將由專人與您聯繫確認細節。若有任何疑問，歡迎隨時聯繫 LINE 官方帳號。\n期待在您的活動現場為您服務！\n\n李伯伯糖葫蘆 敬上`;

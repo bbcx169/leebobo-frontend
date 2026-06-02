@@ -249,7 +249,9 @@ GAS API 主要負責：
 - 寄送 Email
 - 同步 Google Sheets 訂單報表
 - 軟刪除報表列
-- 儲存 LINE 提醒設定
+- 儲存 Telegram 每日出貨提醒設定
+- 儲存通知事件、通道與共同管理者設定
+- 寫入通知發送紀錄
 - 推送 LINE / Telegram / Email 通知
 
 前端使用的 GAS Web App URL 由 Vite 環境變數集中管理：
@@ -288,6 +290,20 @@ reminderTime
 ```
 
 提醒設定目前會同步寫入大小寫兩組 key，以相容既有提醒排程邏輯。
+
+### 管理者通知時機
+
+後台「通知規則設定」可管理共同管理者、事件是否啟用、Email / LINE / Telegram 通道、收件人、測試通知與通知紀錄。通知設定儲存在 Firestore `settings/notificationSettings`，發送紀錄寫入 `notificationLogs`。
+
+| 時機 | 預設 Email | 預設 LINE | 預設 Telegram | 內容 | 觸發條件 / 備註 |
+|---|---:|---:|---:|---|---|
+| 顧客送出新訂單 | 會 | 會 | 會 | 新訂單、訂單編號、訂購人、活動日期時間、Sheets 同步狀態、PDF 連結 / 附件 | `create_order` 流程會呼叫 `newOrder` 通知規則；可在後台改通道與收件人。 |
+| 每日出貨提醒 | 不會 | 不會 | 會 | 明日出貨總覽：訂單數、糖葫蘆總數、掃帚租借數、各訂單時間 / 編號 / 訂購人 / 地點 / 品項 / 金額 / PDF | 後台啟用每日提醒後，GAS trigger 每天依設定時間執行 `dailyShippingReminder` 通知規則。 |
+| 後台修改訂單並重產 PDF | 不會 | 不會 | 不會 | 訂單編號、活動日期時間、更新後 PDF 附件 | 對應 `orderUpdated` 通知規則；預設關閉，可在後台啟用。 |
+| 後台或顧客補寄 PDF | 不會 | 不會 | 不會 | 訂單編號、補寄 Email | 對應 `resendPdf` 通知規則；預設關閉，可在後台啟用。 |
+| 後台刪除訂單 | 不會 | 不會 | 不會 | 訂單編號 | 對應 `orderDeleted` 通知規則；預設關閉，可在後台啟用。 |
+| Sheets 同步失敗 | 會 | 不會 | 會 | 訂單編號、同步錯誤訊息 | 對應 `sheetSyncFailed` 通知規則；預設 Email + Telegram。 |
+| 儲存每日提醒設定 | 不會 | 不會 | 不會 | 無立即通知 | 只建立 / 更新 GAS 定時 trigger。 |
 
 ## Google Sheets 訂單報表
 

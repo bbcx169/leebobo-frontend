@@ -1,9 +1,5 @@
 function createFirestoreOrder(orderData) {
-  const projectId = getFirebaseProjectId();
-  const url = getFirestoreCollectionUrl(projectId, 'orders');
-  const response = callFirestoreApi(url, 'post', {
-    fields: toFirestoreFields(orderData)
-  });
+  const response = createFirestoreDocument('orders', orderData);
 
   const documentName = response.name || '';
   const firestoreDocumentId = documentName.split('/').pop();
@@ -18,16 +14,77 @@ function createFirestoreOrder(orderData) {
 }
 
 function updateFirestoreOrder(documentId, updates) {
+  return updateFirestoreDocument('orders', documentId, updates);
+}
+
+function createFirestoreDocument(collectionName, data) {
+  const projectId = getFirebaseProjectId();
+  const url = getFirestoreCollectionUrl(projectId, collectionName);
+  return callFirestoreApi(url, 'post', {
+    fields: toFirestoreFields(data)
+  });
+}
+
+function getFirestoreDocument(collectionName, documentId) {
+  const projectId = getFirebaseProjectId();
+  const url = getFirestoreDocumentUrl(projectId, collectionName, documentId);
+  const response = UrlFetchApp.fetch(url, {
+    method: 'get',
+    headers: {
+      Authorization: 'Bearer ' + ScriptApp.getOAuthToken()
+    },
+    muteHttpExceptions: true
+  });
+
+  const statusCode = response.getResponseCode();
+  if (statusCode === 404) return null;
+
+  const responseText = response.getContentText();
+  let result = {};
+  if (responseText) {
+    try {
+      result = JSON.parse(responseText);
+    } catch (err) {
+      throw new Error('Firestore returned invalid JSON: ' + responseText);
+    }
+  }
+
+  if (statusCode < 200 || statusCode >= 300) {
+    const message = result.error && result.error.message ? result.error.message : responseText;
+    throw new Error('Firestore request failed (' + statusCode + '): ' + message);
+  }
+
+  return result;
+}
+
+function setFirestoreDocument(collectionName, documentId, data) {
+  const projectId = getFirebaseProjectId();
+  const url = getFirestoreDocumentUrl(projectId, collectionName, documentId);
+  return callFirestoreApi(url, 'patch', {
+    fields: toFirestoreFields(data)
+  });
+}
+
+function updateFirestoreDocument(collectionName, documentId, updates) {
   const projectId = getFirebaseProjectId();
   const cleanUpdates = removeUndefinedFields(updates);
   const updateMask = Object.keys(cleanUpdates)
     .map(function(fieldName) { return 'updateMask.fieldPaths=' + encodeURIComponent(fieldName); })
     .join('&');
-  const url = getFirestoreDocumentUrl(projectId, 'orders', documentId) + (updateMask ? '?' + updateMask : '');
+  const url = getFirestoreDocumentUrl(projectId, collectionName, documentId) + (updateMask ? '?' + updateMask : '');
 
   return callFirestoreApi(url, 'patch', {
     fields: toFirestoreFields(cleanUpdates)
   });
+}
+
+function runFirestoreQuery(structuredQuery) {
+  const projectId = getFirebaseProjectId();
+  const url = 'https://firestore.googleapis.com/v1/projects/' +
+    encodeURIComponent(projectId) +
+    '/databases/(default)/documents:runQuery';
+
+  return callFirestoreApi(url, 'post', { structuredQuery: structuredQuery });
 }
 
 function getFirebaseProjectId() {
@@ -53,15 +110,20 @@ function getFirestoreDocumentUrl(projectId, collectionName, documentId) {
 }
 
 function callFirestoreApi(url, method, payload) {
-  const response = UrlFetchApp.fetch(url, {
+  const options = {
     method: method,
     contentType: 'application/json',
     headers: {
       Authorization: 'Bearer ' + ScriptApp.getOAuthToken()
     },
-    payload: JSON.stringify(payload),
     muteHttpExceptions: true
-  });
+  };
+
+  if (typeof payload !== 'undefined') {
+    options.payload = JSON.stringify(payload);
+  }
+
+  const response = UrlFetchApp.fetch(url, options);
 
   const responseText = response.getContentText();
   let result = {};
@@ -80,6 +142,40 @@ function callFirestoreApi(url, method, payload) {
   }
 
   return result;
+}
+
+function firestoreDocumentToPlainObject(document) {
+  if (!document || !document.fields) return null;
+  const plainObject = firestoreFieldsToPlainObject(document.fields);
+  plainObject.id = String(document.name || '').split('/').pop();
+  return plainObject;
+}
+
+function firestoreFieldsToPlainObject(fields) {
+  const obj = {};
+  Object.keys(fields || {}).forEach(function(key) {
+    obj[key] = firestoreValueToPlain(fields[key]);
+  });
+  return obj;
+}
+
+function firestoreValueToPlain(value) {
+  if (!value) return '';
+  if (Object.prototype.hasOwnProperty.call(value, 'stringValue')) return value.stringValue;
+  if (Object.prototype.hasOwnProperty.call(value, 'integerValue')) return Number(value.integerValue);
+  if (Object.prototype.hasOwnProperty.call(value, 'doubleValue')) return Number(value.doubleValue);
+  if (Object.prototype.hasOwnProperty.call(value, 'booleanValue')) return value.booleanValue;
+  if (Object.prototype.hasOwnProperty.call(value, 'timestampValue')) return value.timestampValue;
+  if (Object.prototype.hasOwnProperty.call(value, 'nullValue')) return null;
+  if (value.arrayValue) {
+    return (value.arrayValue.values || []).map(function(item) {
+      return firestoreValueToPlain(item);
+    });
+  }
+  if (value.mapValue) {
+    return firestoreFieldsToPlainObject(value.mapValue.fields || {});
+  }
+  return '';
 }
 
 function toFirestoreFields(data) {

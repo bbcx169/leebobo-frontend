@@ -5,16 +5,21 @@ import DashboardStats from '../components/Admin/DashboardStats';
 import OrderTable from '../components/Admin/OrderTable';
 import AdminModals from '../components/Admin/AdminModals';
 import RevenueReport from '../components/Admin/RevenueReport';
+import NotificationSettings from '../components/Admin/NotificationSettings';
 import { products } from '../constants/data';
 import { onAdminAuthStateChanged, signInAdminWithEmail, signInAdminWithGoogle, signOutAdmin } from '../utils/adminAuth';
 import {
   deleteAdminOrder,
   fetchAdminOrdersPage,
   fetchAdminSettings,
+  fetchNotificationLogs,
+  fetchNotificationSettings,
   getOrderSearchMode,
   resendAdminOrderPdf,
   saveAdminSettings,
+  saveNotificationSettings,
   searchAdminOrders,
+  sendTestNotification,
   updateAdminOrder
 } from '../utils/adminOrdersApi';
 import {
@@ -70,6 +75,7 @@ function AdminDashboardContent() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
   const [settings, setSettings] = useState({ reminderEnabled: true, reminderTime: '11:00' });
+  const [notificationSettings, setNotificationSettings] = useState(null);
   const [productAvailability, setProductAvailability] = useState(() => normalizeProductAvailability());
   const [alertMsg, setAlertMsg] = useState(null);
 
@@ -134,6 +140,18 @@ function AdminDashboardContent() {
     enabled: authStatus === 'logged_in'
   });
 
+  const notificationSettingsQuery = useQuery({
+    queryKey: ['notificationSettings'],
+    queryFn: fetchNotificationSettings,
+    enabled: authStatus === 'logged_in'
+  });
+
+  const notificationLogsQuery = useQuery({
+    queryKey: ['notificationLogs'],
+    queryFn: fetchNotificationLogs,
+    enabled: authStatus === 'logged_in'
+  });
+
   const searchQuery = useQuery({
     queryKey: ['adminOrderSearch', searchMode, rawSearchTerm],
     queryFn: () => searchAdminOrders(rawSearchTerm),
@@ -148,6 +166,10 @@ function AdminDashboardContent() {
   useEffect(() => {
     if (settingsQuery.data) setSettings(settingsQuery.data);
   }, [settingsQuery.data]);
+
+  useEffect(() => {
+    if (notificationSettingsQuery.data) setNotificationSettings(notificationSettingsQuery.data);
+  }, [notificationSettingsQuery.data]);
 
   useEffect(() => {
     if (productAvailabilityQuery.data) {
@@ -241,6 +263,32 @@ function AdminDashboardContent() {
     }
   });
 
+  const saveNotificationSettingsMutation = useMutation({
+    mutationFn: saveNotificationSettings,
+    onSuccess: (savedSettings) => {
+      setNotificationSettings(savedSettings);
+      setAlertMsg('通知設定已更新。');
+      queryClient.invalidateQueries({ queryKey: ['notificationSettings'] });
+    },
+    onError: (err) => {
+      console.error('Save notification settings failed:', err);
+      setAlertMsg(`通知設定儲存失敗：${err.message}`);
+    }
+  });
+
+  const testNotificationMutation = useMutation({
+    mutationFn: sendTestNotification,
+    onSuccess: () => {
+      setAlertMsg('測試通知已送出。');
+      queryClient.invalidateQueries({ queryKey: ['notificationLogs'] });
+    },
+    onError: (err) => {
+      console.error('Test notification failed:', err);
+      setAlertMsg(`測試通知失敗：${err.message}`);
+      queryClient.invalidateQueries({ queryKey: ['notificationLogs'] });
+    }
+  });
+
   const saveProductAvailabilityMutation = useMutation({
     mutationFn: saveProductAvailability,
     onSuccess: (availability) => {
@@ -328,6 +376,11 @@ function AdminDashboardContent() {
 
   const handleSaveSettings = () => {
     saveSettingsMutation.mutate(settings);
+  };
+
+  const handleSaveNotificationSettings = () => {
+    if (!notificationSettings) return;
+    saveNotificationSettingsMutation.mutate(notificationSettings);
   };
 
   const handleProductAvailabilityChange = (productId, isAvailable) => {
@@ -423,7 +476,7 @@ function AdminDashboardContent() {
     { id: 'settings', icon: '⚙️', label: '系統設定' }
   ];
 
-  const isLoading = ordersQuery.isLoading || settingsQuery.isLoading || productAvailabilityQuery.isLoading;
+  const isLoading = ordersQuery.isLoading || settingsQuery.isLoading || productAvailabilityQuery.isLoading || notificationSettingsQuery.isLoading;
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100 text-darkWood">
@@ -588,6 +641,18 @@ function AdminDashboardContent() {
                 </div>
               </div>
             </section>
+
+            <NotificationSettings
+              settings={notificationSettings}
+              setSettings={setNotificationSettings}
+              logs={notificationLogsQuery.data || []}
+              isSaving={saveNotificationSettingsMutation.isPending}
+              isTesting={testNotificationMutation.isPending}
+              isLoadingLogs={notificationLogsQuery.isFetching}
+              onSave={handleSaveNotificationSettings}
+              onTest={payload => testNotificationMutation.mutate(payload)}
+              onRefreshLogs={() => queryClient.invalidateQueries({ queryKey: ['notificationLogs'] })}
+            />
           </div>
         )}
 

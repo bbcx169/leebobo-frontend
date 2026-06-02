@@ -35,7 +35,9 @@ function sendDailyShippingReminder() {
   const orders = fetchOrdersByEventDate(targetDate);
   const message = buildShippingReminderMessage(displayDate, orders);
 
-  sendTelegramMessage(message);
+  dispatchAdminNotification('dailyShippingReminder', message, {
+    subject: '【系統通知】每日出貨提醒 - ' + displayDate
+  });
 }
 
 function fetchOrdersByEventDate(eventDate) {
