@@ -87,6 +87,11 @@ function runFirestoreQuery(structuredQuery) {
   return callFirestoreApi(url, 'post', { structuredQuery: structuredQuery });
 }
 
+function deleteFirestoreDocumentByName(documentName) {
+  const url = 'https://firestore.googleapis.com/v1/' + String(documentName || '').replace(/^\/+/, '');
+  return callFirestoreApi(url, 'delete');
+}
+
 function getFirebaseProjectId() {
   const projectId = getScriptConfigValue(
     'FIREBASE_PROJECT_ID',

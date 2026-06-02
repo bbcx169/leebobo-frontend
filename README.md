@@ -293,7 +293,7 @@ reminderTime
 
 ### 管理者通知時機
 
-後台「通知規則設定」可管理共同管理者、事件是否啟用、Email / LINE / Telegram 通道、收件人、測試通知與通知紀錄。通知設定儲存在 Firestore `settings/notificationSettings`，發送紀錄寫入 `notificationLogs`。完整 Email、LINE userId、Telegram chatId 只由 GAS 讀寫；後台讀取設定時只回傳遮罩值與是否已設定，輸入框留空代表保留原值，勾選清除才會刪除該通道設定。
+後台「每日出貨提醒排程設定」只控制每日提醒是否啟用與發送時間；實際通知通道與收件人由「通知規則設定」決定。「通知規則設定」可管理共同管理者、事件是否啟用、Email / LINE / Telegram 通道、收件人、測試通知與通知紀錄。通知設定儲存在 Firestore `settings/notificationSettings`，發送紀錄寫入 `notificationLogs`。完整 Email、LINE userId、Telegram chatId 只由 GAS 讀寫；後台讀取設定時只回傳遮罩值與是否已設定，輸入框留空代表保留原值，勾選清除才會刪除該通道設定。通知紀錄保留最近 60 天，後台固定高度顯示最近 30 筆。
 
 | 時機 | 預設 Email | 預設 LINE | 預設 Telegram | 內容 | 觸發條件 / 備註 |
 |---|---:|---:|---:|---|---|

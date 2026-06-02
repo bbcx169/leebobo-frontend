@@ -165,7 +165,7 @@ export const sendTestNotification = async ({ recipientId, channel }) => {
 };
 
 export const fetchNotificationLogs = async () => {
-  const result = await callGasApi({ action: 'get_notification_logs', limit: 50 });
+  const result = await callGasApi({ action: 'get_notification_logs', limit: 30 });
   return result.data || [];
 };
 

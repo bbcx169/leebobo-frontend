@@ -1,6 +1,8 @@
 const NOTIFICATION_SETTINGS_COLLECTION = 'settings';
 const NOTIFICATION_SETTINGS_DOCUMENT = 'notificationSettings';
 const NOTIFICATION_LOGS_COLLECTION = 'notificationLogs';
+const NOTIFICATION_LOG_RETENTION_DAYS = 60;
+const NOTIFICATION_LOG_PRUNE_INTERVAL_HOURS = 12;
 
 const NOTIFICATION_EVENT_DEFINITIONS = [
   { key: 'newOrder', label: '新訂單' },
@@ -273,9 +275,43 @@ function logNotificationResult(result) {
       error: result.error || '',
       createdAt: new Date()
     });
+    pruneNotificationLogsIfNeeded();
   } catch (err) {
     Logger.log('Unable to write notification log: ' + err.toString());
   }
+}
+
+function pruneNotificationLogsIfNeeded() {
+  const props = PropertiesService.getScriptProperties();
+  const now = new Date();
+  const lastPrunedAt = Number(props.getProperty('NOTIFICATION_LOGS_LAST_PRUNED_AT') || 0);
+  if (lastPrunedAt && now.getTime() - lastPrunedAt < NOTIFICATION_LOG_PRUNE_INTERVAL_HOURS * 60 * 60 * 1000) {
+    return;
+  }
+
+  const cutoffDate = new Date(now.getTime() - NOTIFICATION_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const oldLogs = runFirestoreQuery({
+    from: [{ collectionId: NOTIFICATION_LOGS_COLLECTION }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'createdAt' },
+        op: 'LESS_THAN',
+        value: { timestampValue: cutoffDate.toISOString() }
+      }
+    },
+    orderBy: [
+      { field: { fieldPath: 'createdAt' }, direction: 'ASCENDING' }
+    ],
+    limit: 100
+  });
+
+  oldLogs
+    .filter(function(item) { return item.document && item.document.name; })
+    .forEach(function(item) {
+      deleteFirestoreDocumentByName(item.document.name);
+    });
+
+  props.setProperty('NOTIFICATION_LOGS_LAST_PRUNED_AT', String(now.getTime()));
 }
 
 function getDefaultNotificationSettings() {

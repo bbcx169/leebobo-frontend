@@ -49,7 +49,7 @@ function doPost(e) {
         return handleTestNotification(data);
 
       case 'get_notification_logs':
-        return jsonResponse({ status: 'success', data: getNotificationLogs(data.limit || 50) });
+        return jsonResponse({ status: 'success', data: getNotificationLogs(data.limit || 30) });
 
       case 'admin_resend_pdf':
       case 'resendPdf':

@@ -320,7 +320,10 @@ export default function NotificationSettings({
 
         <div>
           <div className="flex items-center justify-between gap-4 mb-4">
-            <h4 className="text-xl font-bold text-gray-800">通知紀錄</h4>
+            <div>
+              <h4 className="text-xl font-bold text-gray-800">通知紀錄</h4>
+              <p className="text-sm text-gray-400 mt-1">後台只顯示最近 30 筆；紀錄區固定高度，可在表格內捲動。</p>
+            </div>
             <button
               type="button"
               onClick={onRefreshLogs}
@@ -331,9 +334,9 @@ export default function NotificationSettings({
             </button>
           </div>
 
-          <div className="overflow-x-auto border border-gray-100 rounded-2xl">
+          <div className="overflow-auto max-h-[520px] border border-gray-100 rounded-2xl">
             <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500">
+              <thead className="bg-gray-50 text-gray-500 sticky top-0 z-10">
                 <tr>
                   <th className="text-left px-4 py-3 font-bold">時間</th>
                   <th className="text-left px-4 py-3 font-bold">事件</th>
