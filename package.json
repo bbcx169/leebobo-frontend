@@ -8,7 +8,11 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "admin:set-claim": "node scripts/setAdminClaim.mjs"
+    "admin:set-claim": "node scripts/setAdminClaim.mjs",
+    "clasp:login": "clasp login",
+    "gas:status": "clasp status --project .",
+    "gas:push": "clasp push --project . --force",
+    "prepush:gas": "node scripts/prepush-clasp.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.9",
@@ -19,6 +23,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@google/clasp": "^3.3.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-basic-ssl": "^2.3.0",

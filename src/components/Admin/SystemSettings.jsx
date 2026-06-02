@@ -16,14 +16,14 @@ export default function SystemSettings({
       <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-gray-100">
         <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2 border-b border-gray-100 pb-4">
           <svg className="w-5 h-5 text-[#06C755]" viewBox="0 0 24 24" fill="currentColor"><path d="M24 10.304c0-5.369-5.383-9.738-12-9.738-6.616 0-12 4.369-12 9.738 0 4.814 4.269 8.846 10.036 9.608.391.084.922.258 1.057.592.122.303.079.778.039 1.085l-.171 1.027c-.053.303-.242 1.186 1.039.647 1.281-.54 6.911-4.069 9.428-6.967 1.739-1.907 2.572-3.843 2.572-5.992z"/></svg>
-          LINE 每日出貨提醒報表
+          Telegram 每日出貨提醒報表
         </h3>
         
         <div className="space-y-6 max-w-lg">
           <div className="flex items-center justify-between">
             <div>
               <label className="font-bold text-gray-700 text-base">啟用每日提醒功能</label>
-              <p className="text-sm text-gray-500 mt-1">系統將在指定時間，發送「明日訂單總覽」至 LINE 官方帳號。</p>
+              <p className="text-sm text-gray-500 mt-1">系統將在指定時間，只透過 Telegram 發送「明日訂單總覽」給管理者。</p>
             </div>
             <div className="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
               <input 

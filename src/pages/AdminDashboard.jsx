@@ -567,18 +567,19 @@ function AdminDashboardContent() {
             </section>
 
             <section className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-              <h3 className="text-2xl font-bold text-gray-800 mb-6 border-b border-gray-100 pb-4">LINE 提醒設定</h3>
+              <h3 className="text-2xl font-bold text-gray-800 mb-6 border-b border-gray-100 pb-4">Telegram 每日出貨提醒設定</h3>
               <div className="space-y-8">
                 <div className="flex items-center justify-between gap-6">
                   <div>
-                    <label className="text-xl font-bold text-gray-700">啟用提醒</label>
-                    <p className="text-base text-gray-400 mt-1">開啟後會依照設定時間推送管理提醒。</p>
+                    <label className="text-xl font-bold text-gray-700">啟用每日提醒</label>
+                    <p className="text-base text-gray-400 mt-1">系統會在指定時間，只透過 Telegram 發送明日出貨總覽給管理者。</p>
                   </div>
                   <input type="checkbox" checked={settings.reminderEnabled} onChange={e => setSettings({ ...settings, reminderEnabled: e.target.checked })} className="w-8 h-8 accent-amberRed rounded-lg cursor-pointer" />
                 </div>
                 <div className={`transition-all ${settings.reminderEnabled ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
                   <label className="block text-lg font-bold text-gray-700 mb-3">提醒時間</label>
                   <input type="time" value={settings.reminderTime} onChange={e => setSettings({ ...settings, reminderTime: e.target.value })} className="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-xl outline-none focus:ring-2 focus:ring-amberRed" />
+                  <p className="text-sm text-gray-400 mt-3">目前通道：Telegram</p>
                 </div>
                 <div className="pt-6 border-t border-gray-100">
                   <button onClick={handleSaveSettings} disabled={saveSettingsMutation.isPending} className="px-12 py-4 bg-darkWood text-white font-bold text-xl rounded-2xl hover:bg-black transition-all shadow-lg disabled:opacity-50">

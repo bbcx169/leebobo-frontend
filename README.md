@@ -267,7 +267,9 @@ src/config.js
 
 `gas/` 目錄是 GAS API 的正式維護來源；`Api.gs` 只保留 Web App 入口與 action routing。正式 GAS 程式碼只保留 `.gs` 檔，避免 `.js` 備份與 `.gs` 版本不同步。
 
-本專案已移除 clasp 專案綁定與登入設定，不再透過 clasp push/deploy 維護 GAS。更新 GAS 時，請手動將 `gas/` 內對應檔案內容同步到 Apps Script 編輯器，或另行建立明確的部署流程。
+本專案使用 clasp 維護 GAS 原始碼。`.clasp.json` 內含 Apps Script `scriptId`，屬本機設定且已由 `.gitignore` 排除；請複製 `.clasp.json.example` 為 `.clasp.json` 並填入實際 `scriptId`。
+
+已設定本機 Git `pre-push` hook：執行 `git push` 時會先跑 `npm run gas:push`，將 `gas/` 目錄內的 GAS 檔案推送到 Apps Script。若臨時只想推 Git、不推 GAS，可使用 `SKIP_GAS_PUSH=1 git push`。
 
 常見需要確認的 GAS Script Properties：
 
@@ -365,8 +367,10 @@ npm run build
 
 GAS 修改後：
 
-1. 手動更新 Apps Script 專案檔案
-2. 重新部署 Web App
-3. 確認前端使用的是新版 Web App URL
-4. 測試 `get_settings` / `save_settings`
-5. 測試新訂單 PDF 與 Sheets 同步
+1. 確認本機 `.clasp.json` 已設定 Apps Script `scriptId`
+2. 執行 `npm run gas:status` 檢查 clasp 將同步的檔案
+3. 執行 `git push`，pre-push hook 會先自動執行 `npm run gas:push`
+4. 重新部署 Web App
+5. 確認前端使用的是新版 Web App URL
+6. 測試 `get_settings` / `save_settings`
+7. 測試新訂單 PDF 與 Sheets 同步

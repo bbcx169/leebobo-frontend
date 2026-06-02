@@ -7,7 +7,8 @@ function getAdminSettings() {
 
   return {
     reminderEnabled: (lowercaseEnabled !== null ? lowercaseEnabled : uppercaseEnabled) !== 'false',
-    reminderTime: lowercaseTime || uppercaseTime || '11:00'
+    reminderTime: lowercaseTime || uppercaseTime || '11:00',
+    reminderChannel: 'telegram'
   };
 }
 
@@ -31,6 +32,7 @@ function saveAdminSettings(data) {
 
   return {
     reminderEnabled: reminderEnabled,
-    reminderTime: reminderTime
+    reminderTime: reminderTime,
+    reminderChannel: 'telegram'
   };
 }
