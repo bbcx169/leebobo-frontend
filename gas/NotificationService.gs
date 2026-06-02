@@ -52,11 +52,17 @@ function getNotificationSettings() {
   return normalizeNotificationSettings(firestoreDocumentToPlainObject(document));
 }
 
+function getNotificationSettingsForAdmin() {
+  return maskNotificationSettingsForAdmin(getNotificationSettings());
+}
+
 function saveNotificationSettings(settings) {
-  const normalizedSettings = normalizeNotificationSettings(settings);
+  const currentSettings = getNotificationSettings();
+  const mergedSettings = mergeNotificationSettingsForSave(currentSettings, settings || {});
+  const normalizedSettings = normalizeNotificationSettings(mergedSettings);
   normalizedSettings.updatedAt = new Date();
   setFirestoreDocument(NOTIFICATION_SETTINGS_COLLECTION, NOTIFICATION_SETTINGS_DOCUMENT, normalizedSettings);
-  return normalizeNotificationSettings(normalizedSettings);
+  return maskNotificationSettingsForAdmin(normalizeNotificationSettings(normalizedSettings));
 }
 
 function dispatchAdminNotification(eventKey, messageText, options) {
@@ -367,6 +373,72 @@ function normalizeNotificationSettings(settings) {
     recipients: normalizedRecipients,
     rules: normalizedRules,
     updatedAt: sourceSettings.updatedAt || ''
+  };
+}
+
+function mergeNotificationSettingsForSave(currentSettings, incomingSettings) {
+  const currentRecipients = currentSettings.recipients || [];
+  const incomingRecipients = Array.isArray(incomingSettings.recipients) ? incomingSettings.recipients : [];
+  const currentRecipientMap = {};
+  currentRecipients.forEach(function(recipient) {
+    currentRecipientMap[recipient.id] = recipient;
+  });
+
+  const mergedRecipients = incomingRecipients.map(function(incomingRecipient) {
+    const recipientId = String(incomingRecipient.id || '').trim();
+    const existingRecipient = currentRecipientMap[recipientId] || {};
+    return {
+      id: recipientId || ('recipient_' + new Date().getTime()),
+      name: String(incomingRecipient.name || existingRecipient.name || '').trim(),
+      enabled: incomingRecipient.enabled !== false,
+      email: mergeSensitiveContactValue(existingRecipient.email, incomingRecipient.email, incomingRecipient.clearEmail),
+      lineUserId: mergeSensitiveContactValue(existingRecipient.lineUserId, incomingRecipient.lineUserId, incomingRecipient.clearLineUserId),
+      telegramChatId: mergeSensitiveContactValue(existingRecipient.telegramChatId, incomingRecipient.telegramChatId, incomingRecipient.clearTelegramChatId)
+    };
+  });
+
+  return {
+    recipients: mergedRecipients,
+    rules: incomingSettings.rules || currentSettings.rules || {},
+    updatedAt: currentSettings.updatedAt || ''
+  };
+}
+
+function mergeSensitiveContactValue(existingValue, incomingValue, shouldClear) {
+  if (shouldClear === true) return '';
+  const cleanIncomingValue = String(incomingValue || '').trim();
+  if (cleanIncomingValue) return cleanIncomingValue;
+  return String(existingValue || '').trim();
+}
+
+function maskNotificationSettingsForAdmin(settings) {
+  const normalizedSettings = normalizeNotificationSettings(settings);
+  return {
+    events: normalizedSettings.events,
+    rules: normalizedSettings.rules,
+    updatedAt: normalizedSettings.updatedAt || '',
+    recipients: (normalizedSettings.recipients || []).map(function(recipient) {
+      const email = String(recipient.email || '').trim();
+      const lineUserId = String(recipient.lineUserId || '').trim();
+      const telegramChatId = String(recipient.telegramChatId || '').trim();
+      return {
+        id: recipient.id,
+        name: recipient.name,
+        enabled: recipient.enabled !== false,
+        email: '',
+        lineUserId: '',
+        telegramChatId: '',
+        emailMasked: maskNotificationTarget(email),
+        lineUserIdMasked: maskNotificationTarget(lineUserId),
+        telegramChatIdMasked: maskNotificationTarget(telegramChatId),
+        hasEmail: Boolean(email),
+        hasLineUserId: Boolean(lineUserId),
+        hasTelegramChatId: Boolean(telegramChatId),
+        clearEmail: false,
+        clearLineUserId: false,
+        clearTelegramChatId: false
+      };
+    })
   };
 }
 

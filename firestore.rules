@@ -56,7 +56,7 @@ service cloud.firestore {
     }
 
     match /settings/{document=**} {
-      allow read: if true;
+      allow read: if false;
       allow write: if false;
     }
 

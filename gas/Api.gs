@@ -40,7 +40,7 @@ function doPost(e) {
         return handleSaveSettings(data);
 
       case 'get_notification_settings':
-        return jsonResponse({ status: 'success', data: getNotificationSettings() });
+        return jsonResponse({ status: 'success', data: getNotificationSettingsForAdmin() });
 
       case 'save_notification_settings':
         return handleSaveNotificationSettings(data);

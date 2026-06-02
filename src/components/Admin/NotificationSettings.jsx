@@ -1,9 +1,9 @@
 import React from 'react';
 
 const CHANNELS = [
-  { key: 'email', label: 'Email' },
-  { key: 'line', label: 'LINE' },
-  { key: 'telegram', label: 'Telegram' }
+  { key: 'email', label: 'Email', valueKey: 'email', maskedKey: 'emailMasked', hasKey: 'hasEmail', clearKey: 'clearEmail' },
+  { key: 'line', label: 'LINE', valueKey: 'lineUserId', maskedKey: 'lineUserIdMasked', hasKey: 'hasLineUserId', clearKey: 'clearLineUserId' },
+  { key: 'telegram', label: 'Telegram', valueKey: 'telegramChatId', maskedKey: 'telegramChatIdMasked', hasKey: 'hasTelegramChatId', clearKey: 'clearTelegramChatId' }
 ];
 
 const EVENT_HELP_TEXT = {
@@ -16,11 +16,12 @@ const EVENT_HELP_TEXT = {
   notificationFailed: '保留給通知失敗警示。'
 };
 
-const getTargetValue = (recipient, channel) => {
-  if (channel === 'email') return recipient.email || '';
-  if (channel === 'line') return recipient.lineUserId || '';
-  if (channel === 'telegram') return recipient.telegramChatId || '';
-  return '';
+const getChannelMeta = (channelKey) => CHANNELS.find(channel => channel.key === channelKey);
+
+const canTestChannel = (recipient, channelKey) => {
+  const channel = getChannelMeta(channelKey);
+  if (!channel) return false;
+  return Boolean(recipient[channel.hasKey]) && recipient[channel.clearKey] !== true;
 };
 
 export default function NotificationSettings({
@@ -63,7 +64,16 @@ export default function NotificationSettings({
           enabled: true,
           email: '',
           lineUserId: '',
-          telegramChatId: ''
+          telegramChatId: '',
+          emailMasked: '',
+          lineUserIdMasked: '',
+          telegramChatIdMasked: '',
+          hasEmail: false,
+          hasLineUserId: false,
+          hasTelegramChatId: false,
+          clearEmail: false,
+          clearLineUserId: false,
+          clearTelegramChatId: false
         }
       ]
     });
@@ -116,12 +126,51 @@ export default function NotificationSettings({
     });
   };
 
+  const renderContactInput = (recipient, channel) => {
+    const hasValue = Boolean(recipient[channel.hasKey]);
+    const isClearing = recipient[channel.clearKey] === true;
+    const newValue = recipient[channel.valueKey] || '';
+    const maskedValue = recipient[channel.maskedKey] || '';
+
+    return (
+      <label className="block">
+        <span className="block text-sm font-bold text-gray-500 mb-1">{channel.label}</span>
+        <input
+          value={newValue}
+          disabled={isClearing}
+          placeholder={hasValue ? '留空保留既有設定；輸入新值才覆蓋' : '尚未設定，請輸入新值'}
+          onChange={e => updateRecipient(recipient.id, { [channel.valueKey]: e.target.value })}
+          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amberRed disabled:opacity-50"
+        />
+        <div className="flex flex-col gap-1 mt-2">
+          <p className="text-xs text-gray-500">
+            {hasValue ? `已設定：${maskedValue}` : '尚未設定'}
+          </p>
+          {hasValue && (
+            <label className="inline-flex items-center gap-2 text-xs font-bold text-red-600">
+              <input
+                type="checkbox"
+                checked={isClearing}
+                onChange={e => updateRecipient(recipient.id, {
+                  [channel.clearKey]: e.target.checked,
+                  [channel.valueKey]: e.target.checked ? '' : newValue
+                })}
+                className="accent-red-600"
+              />
+              清除此通道設定
+            </label>
+          )}
+        </div>
+      </label>
+    );
+  };
+
   return (
     <section className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4 mb-6">
         <div>
           <h3 className="text-2xl font-bold text-gray-800">通知規則設定</h3>
-          <p className="text-gray-500 mt-1">管理事件、通道、共同管理者與通知紀錄。</p>
+          <p className="text-gray-500 mt-1">後台只顯示遮罩聯絡資料；完整 Email、LINE userId、Telegram chatId 僅由 GAS 端保留。</p>
         </div>
         <button
           onClick={onSave}
@@ -158,31 +207,11 @@ export default function NotificationSettings({
                         className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amberRed"
                       />
                     </label>
-                    <label className="block">
-                      <span className="block text-sm font-bold text-gray-500 mb-1">Email</span>
-                      <input
-                        type="email"
-                        value={recipient.email || ''}
-                        onChange={e => updateRecipient(recipient.id, { email: e.target.value })}
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amberRed"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="block text-sm font-bold text-gray-500 mb-1">LINE userId</span>
-                      <input
-                        value={recipient.lineUserId || ''}
-                        onChange={e => updateRecipient(recipient.id, { lineUserId: e.target.value })}
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amberRed"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="block text-sm font-bold text-gray-500 mb-1">Telegram chatId</span>
-                      <input
-                        value={recipient.telegramChatId || ''}
-                        onChange={e => updateRecipient(recipient.id, { telegramChatId: e.target.value })}
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amberRed"
-                      />
-                    </label>
+                    {CHANNELS.map(channel => (
+                      <React.Fragment key={channel.key}>
+                        {renderContactInput(recipient, channel)}
+                      </React.Fragment>
+                    ))}
                   </div>
 
                   <div className="flex md:flex-col gap-3 md:items-end justify-between">
@@ -212,12 +241,13 @@ export default function NotificationSettings({
                       key={channel.key}
                       type="button"
                       onClick={() => onTest({ recipientId: recipient.id, channel: channel.key })}
-                      disabled={isTesting || !getTargetValue(recipient, channel.key)}
+                      disabled={isTesting || !canTestChannel(recipient, channel.key)}
                       className="px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:border-amberRed disabled:opacity-40"
                     >
                       測試 {channel.label}
                     </button>
                   ))}
+                  <p className="basis-full text-xs text-gray-400">新輸入的聯絡值需先儲存，才能發送測試通知。</p>
                 </div>
               </div>
             ))}
