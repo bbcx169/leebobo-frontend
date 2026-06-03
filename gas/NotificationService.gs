@@ -71,13 +71,12 @@ function dispatchAdminNotification(eventKey, messageText, options) {
   const settings = getNotificationSettings();
   const eventDefinition = getNotificationEventDefinition(eventKey);
   const rule = settings.rules[eventKey] || {};
-  const enabledChannels = getEnabledRuleChannels(rule);
-  const recipients = getRuleRecipients(settings, rule);
+  const deliveries = getRuleDeliveries(settings, rule);
   const subject = (options && options.subject) || eventDefinition.label;
   const attachments = (options && options.attachments) || [];
   const results = [];
 
-  if (rule.enabled === false || !enabledChannels.length || !recipients.length) {
+  if (rule.enabled === false || !deliveries.length) {
     logNotificationResult({
       eventKey: eventKey,
       eventLabel: eventDefinition.label,
@@ -91,42 +90,42 @@ function dispatchAdminNotification(eventKey, messageText, options) {
     return results;
   }
 
-  enabledChannels.forEach(function(channel) {
-    recipients.forEach(function(recipient) {
-      const target = getRecipientTarget(recipient, channel);
-      const baseLog = {
-        eventKey: eventKey,
-        eventLabel: eventDefinition.label,
-        channel: channel,
-        recipientName: recipient.name || recipient.id || '',
-        recipientId: recipient.id || '',
-        target: target
-      };
+  deliveries.forEach(function(delivery) {
+    const channel = delivery.channel;
+    const recipient = delivery.recipient;
+    const target = getRecipientTarget(recipient, channel);
+    const baseLog = {
+      eventKey: eventKey,
+      eventLabel: eventDefinition.label,
+      channel: channel,
+      recipientName: recipient.name || recipient.id || '',
+      recipientId: recipient.id || '',
+      target: target
+    };
 
-      if (!target) {
-        const skippedResult = Object.assign({}, baseLog, {
-          status: 'skipped',
-          error: 'Recipient has no target for ' + channel + '.'
-        });
-        logNotificationResult(skippedResult);
-        results.push(skippedResult);
-        return;
-      }
+    if (!target) {
+      const skippedResult = Object.assign({}, baseLog, {
+        status: 'skipped',
+        error: 'Recipient has no target for ' + channel + '.'
+      });
+      logNotificationResult(skippedResult);
+      results.push(skippedResult);
+      return;
+    }
 
-      try {
-        sendNotificationChannel(channel, target, subject, messageText, attachments);
-        const successResult = Object.assign({}, baseLog, { status: 'success', error: '' });
-        logNotificationResult(successResult);
-        results.push(successResult);
-      } catch (err) {
-        const failureResult = Object.assign({}, baseLog, {
-          status: 'failure',
-          error: err.toString()
-        });
-        logNotificationResult(failureResult);
-        results.push(failureResult);
-      }
-    });
+    try {
+      sendNotificationChannel(channel, target, subject, messageText, attachments);
+      const successResult = Object.assign({}, baseLog, { status: 'success', error: '' });
+      logNotificationResult(successResult);
+      results.push(successResult);
+    } catch (err) {
+      const failureResult = Object.assign({}, baseLog, {
+        status: 'failure',
+        error: err.toString()
+      });
+      logNotificationResult(failureResult);
+      results.push(failureResult);
+    }
   });
 
   return results;
@@ -333,37 +332,44 @@ function getDefaultNotificationSettings() {
       newOrder: {
         enabled: true,
         channels: { email: true, line: true, telegram: true },
-        recipientIds: ['owner']
+        recipientIds: ['owner'],
+        recipientChannels: { owner: { email: true, line: true, telegram: true } }
       },
       dailyShippingReminder: {
         enabled: true,
         channels: { email: false, line: false, telegram: true },
-        recipientIds: ['owner']
+        recipientIds: ['owner'],
+        recipientChannels: { owner: { email: false, line: false, telegram: true } }
       },
       orderUpdated: {
         enabled: false,
         channels: { email: false, line: false, telegram: true },
-        recipientIds: ['owner']
+        recipientIds: ['owner'],
+        recipientChannels: { owner: { email: false, line: false, telegram: true } }
       },
       orderDeleted: {
         enabled: false,
         channels: { email: false, line: false, telegram: true },
-        recipientIds: ['owner']
+        recipientIds: ['owner'],
+        recipientChannels: { owner: { email: false, line: false, telegram: true } }
       },
       resendPdf: {
         enabled: false,
         channels: { email: false, line: false, telegram: true },
-        recipientIds: ['owner']
+        recipientIds: ['owner'],
+        recipientChannels: { owner: { email: false, line: false, telegram: true } }
       },
       sheetSyncFailed: {
         enabled: true,
         channels: { email: true, line: false, telegram: true },
-        recipientIds: ['owner']
+        recipientIds: ['owner'],
+        recipientChannels: { owner: { email: true, line: false, telegram: true } }
       },
       notificationFailed: {
         enabled: false,
         channels: { email: false, line: false, telegram: true },
-        recipientIds: ['owner']
+        recipientIds: ['owner'],
+        recipientChannels: { owner: { email: false, line: false, telegram: true } }
       }
     },
     updatedAt: ''
@@ -393,16 +399,12 @@ function normalizeNotificationSettings(settings) {
     .forEach(function(eventDefinition) {
       const defaultRule = defaultSettings.rules[eventDefinition.key] || {};
       const sourceRule = sourceRules[eventDefinition.key] || {};
+      const recipientChannels = normalizeRuleRecipientChannels(sourceRule, defaultRule);
       normalizedRules[eventDefinition.key] = {
         enabled: typeof sourceRule.enabled === 'undefined' ? defaultRule.enabled !== false : sourceRule.enabled !== false,
-        channels: {
-          email: Boolean((sourceRule.channels || defaultRule.channels || {}).email),
-          line: Boolean((sourceRule.channels || defaultRule.channels || {}).line),
-          telegram: Boolean((sourceRule.channels || defaultRule.channels || {}).telegram)
-        },
-        recipientIds: Array.isArray(sourceRule.recipientIds) && sourceRule.recipientIds.length
-          ? sourceRule.recipientIds.map(function(id) { return String(id); })
-          : (defaultRule.recipientIds || ['owner'])
+        channels: getAggregateRuleChannels(recipientChannels),
+        recipientIds: Object.keys(recipientChannels),
+        recipientChannels: recipientChannels
       };
     });
 
@@ -494,29 +496,82 @@ function getDefaultNotificationSettingsBase() {
       telegramChatId: String(telegramChatId || '')
     }],
     rules: {
-      newOrder: { enabled: true, channels: { email: true, line: true, telegram: true }, recipientIds: ['owner'] },
-      dailyShippingReminder: { enabled: true, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'] },
-      orderUpdated: { enabled: false, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'] },
-      orderDeleted: { enabled: false, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'] },
-      resendPdf: { enabled: false, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'] },
-      sheetSyncFailed: { enabled: true, channels: { email: true, line: false, telegram: true }, recipientIds: ['owner'] },
-      notificationFailed: { enabled: false, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'] }
+      newOrder: { enabled: true, channels: { email: true, line: true, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: true, line: true, telegram: true } } },
+      dailyShippingReminder: { enabled: true, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: false, line: false, telegram: true } } },
+      orderUpdated: { enabled: false, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: false, line: false, telegram: true } } },
+      orderDeleted: { enabled: false, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: false, line: false, telegram: true } } },
+      resendPdf: { enabled: false, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: false, line: false, telegram: true } } },
+      sheetSyncFailed: { enabled: true, channels: { email: true, line: false, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: true, line: false, telegram: true } } },
+      notificationFailed: { enabled: false, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: false, line: false, telegram: true } } }
     }
   };
 }
 
-function getEnabledRuleChannels(rule) {
-  const channels = rule.channels || {};
-  return ['email', 'line', 'telegram'].filter(function(channel) {
-    return channels[channel] === true;
+function normalizeRuleRecipientChannels(sourceRule, defaultRule) {
+  const sourceRecipientChannels = sourceRule.recipientChannels || {};
+  const normalized = {};
+
+  Object.keys(sourceRecipientChannels).forEach(function(recipientId) {
+    const cleanRecipientId = String(recipientId || '').trim();
+    if (!cleanRecipientId) return;
+    normalized[cleanRecipientId] = normalizeChannelMap(sourceRecipientChannels[recipientId]);
   });
+
+  if (Object.keys(normalized).length) {
+    return normalized;
+  }
+
+  const recipientIds = Array.isArray(sourceRule.recipientIds) && sourceRule.recipientIds.length
+    ? sourceRule.recipientIds
+    : (defaultRule.recipientIds || ['owner']);
+  const channels = sourceRule.channels || defaultRule.channels || {};
+  recipientIds.forEach(function(recipientId) {
+    const cleanRecipientId = String(recipientId || '').trim();
+    if (cleanRecipientId) normalized[cleanRecipientId] = normalizeChannelMap(channels);
+  });
+
+  return normalized;
 }
 
-function getRuleRecipients(settings, rule) {
-  const recipientIds = Array.isArray(rule.recipientIds) ? rule.recipientIds : [];
-  return (settings.recipients || []).filter(function(recipient) {
-    return recipient.enabled !== false && recipientIds.indexOf(recipient.id) !== -1;
+function normalizeChannelMap(channels) {
+  const sourceChannels = channels || {};
+  return {
+    email: sourceChannels.email === true,
+    line: sourceChannels.line === true,
+    telegram: sourceChannels.telegram === true
+  };
+}
+
+function getAggregateRuleChannels(recipientChannels) {
+  const aggregate = { email: false, line: false, telegram: false };
+  Object.keys(recipientChannels || {}).forEach(function(recipientId) {
+    const channels = recipientChannels[recipientId] || {};
+    aggregate.email = aggregate.email || channels.email === true;
+    aggregate.line = aggregate.line || channels.line === true;
+    aggregate.telegram = aggregate.telegram || channels.telegram === true;
   });
+  return aggregate;
+}
+
+function getRuleDeliveries(settings, rule) {
+  const recipientChannels = rule.recipientChannels || {};
+  const recipientMap = {};
+  (settings.recipients || []).forEach(function(recipient) {
+    recipientMap[recipient.id] = recipient;
+  });
+
+  const deliveries = [];
+  Object.keys(recipientChannels).forEach(function(recipientId) {
+    const recipient = recipientMap[recipientId];
+    const channels = recipientChannels[recipientId] || {};
+    if (!recipient || recipient.enabled === false) return;
+    ['email', 'line', 'telegram'].forEach(function(channel) {
+      if (channels[channel] === true) {
+        deliveries.push({ recipient: recipient, channel: channel });
+      }
+    });
+  });
+  return deliveries;
 }
 
 function getRecipientTarget(recipient, channel) {

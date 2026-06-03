@@ -85,10 +85,7 @@ export default function NotificationSettings({
       recipients: recipients.filter(recipient => recipient.id !== recipientId),
       rules: Object.fromEntries(Object.entries(rules).map(([eventKey, rule]) => [
         eventKey,
-        {
-          ...rule,
-          recipientIds: (rule.recipientIds || []).filter(id => id !== recipientId)
-        }
+        removeRuleRecipient(rule, recipientId)
       ]))
     });
   };
@@ -106,24 +103,31 @@ export default function NotificationSettings({
     });
   };
 
-  const updateRuleChannel = (eventKey, channel, enabled) => {
+  const updateRecipientChannel = (eventKey, recipientId, channel, enabled) => {
     const rule = rules[eventKey] || {};
-    updateRule(eventKey, {
-      channels: {
-        ...(rule.channels || {}),
+    const currentRecipientChannels = rule.recipientChannels || {};
+    const nextRecipientChannels = {
+      ...currentRecipientChannels,
+      [recipientId]: {
+        ...(currentRecipientChannels[recipientId] || {}),
         [channel]: enabled
       }
+    };
+
+    if (!hasAnyEnabledChannel(nextRecipientChannels[recipientId])) {
+      delete nextRecipientChannels[recipientId];
+    }
+
+    updateRule(eventKey, {
+      recipientChannels: nextRecipientChannels,
+      recipientIds: getRecipientIdsFromChannels(nextRecipientChannels),
+      channels: getAggregateChannels(nextRecipientChannels)
     });
   };
 
-  const toggleRuleRecipient = (eventKey, recipientId, enabled) => {
-    const rule = rules[eventKey] || {};
-    const currentIds = rule.recipientIds || [];
-    updateRule(eventKey, {
-      recipientIds: enabled
-        ? Array.from(new Set([...currentIds, recipientId]))
-        : currentIds.filter(id => id !== recipientId)
-    });
+  const getRuleRecipientChannels = (rule, recipientId) => {
+    const recipientChannels = rule.recipientChannels || {};
+    return recipientChannels[recipientId] || {};
   };
 
   const renderContactInput = (recipient, channel) => {
@@ -255,17 +259,14 @@ export default function NotificationSettings({
         </div>
 
         <div>
-          <h4 className="text-xl font-bold text-gray-800 mb-4">事件通道</h4>
+          <h4 className="text-xl font-bold text-gray-800 mb-4">事件收件人通道</h4>
           <div className="overflow-x-auto border border-gray-100 rounded-2xl">
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 text-gray-500">
                 <tr>
                   <th className="text-left px-4 py-3 font-bold">事件</th>
                   <th className="text-center px-4 py-3 font-bold">啟用</th>
-                  {CHANNELS.map(channel => (
-                    <th key={channel.key} className="text-center px-4 py-3 font-bold">{channel.label}</th>
-                  ))}
-                  <th className="text-left px-4 py-3 font-bold">收件人</th>
+                  <th className="text-left px-4 py-3 font-bold">每位管理者通知通道</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -285,29 +286,34 @@ export default function NotificationSettings({
                           className="w-5 h-5 accent-amberRed"
                         />
                       </td>
-                      {CHANNELS.map(channel => (
-                        <td key={channel.key} className="px-4 py-4 text-center">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(rule.channels?.[channel.key])}
-                            onChange={e => updateRuleChannel(event.key, channel.key, e.target.checked)}
-                            className="w-5 h-5 accent-amberRed"
-                          />
-                        </td>
-                      ))}
-                      <td className="px-4 py-4 min-w-[260px]">
-                        <div className="flex flex-wrap gap-2">
-                          {recipients.map(recipient => (
-                            <label key={recipient.id} className="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700">
-                              <input
-                                type="checkbox"
-                                checked={(rule.recipientIds || []).includes(recipient.id)}
-                                onChange={e => toggleRuleRecipient(event.key, recipient.id, e.target.checked)}
-                                className="accent-amberRed"
-                              />
-                              {recipient.name || recipient.id}
-                            </label>
-                          ))}
+                      <td className="px-4 py-4 min-w-[560px]">
+                        <div className="space-y-3">
+                          {recipients.map(recipient => {
+                            const recipientChannels = getRuleRecipientChannels(rule, recipient.id);
+                            return (
+                              <div key={recipient.id} className="flex flex-col lg:flex-row lg:items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                                <div className="min-w-[160px] font-bold text-gray-700">
+                                  {recipient.name || recipient.id}
+                                  {recipient.enabled === false && (
+                                    <span className="ml-2 text-xs text-gray-400">已停用</span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {CHANNELS.map(channel => (
+                                    <label key={channel.key} className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl font-bold text-gray-700">
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(recipientChannels[channel.key])}
+                                        onChange={e => updateRecipientChannel(event.key, recipient.id, channel.key, e.target.checked)}
+                                        className="accent-amberRed"
+                                      />
+                                      {channel.label}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </td>
                     </tr>
@@ -374,3 +380,27 @@ export default function NotificationSettings({
     </section>
   );
 }
+
+const hasAnyEnabledChannel = (channels = {}) => CHANNELS.some(channel => channels[channel.key] === true);
+
+const getRecipientIdsFromChannels = (recipientChannels = {}) => (
+  Object.entries(recipientChannels)
+    .filter(([, channels]) => hasAnyEnabledChannel(channels))
+    .map(([recipientId]) => recipientId)
+);
+
+const getAggregateChannels = (recipientChannels = {}) => CHANNELS.reduce((aggregate, channel) => ({
+  ...aggregate,
+  [channel.key]: Object.values(recipientChannels).some(channels => channels?.[channel.key] === true)
+}), {});
+
+const removeRuleRecipient = (rule = {}, recipientId) => {
+  const nextRecipientChannels = { ...(rule.recipientChannels || {}) };
+  delete nextRecipientChannels[recipientId];
+  return {
+    ...rule,
+    recipientChannels: nextRecipientChannels,
+    recipientIds: getRecipientIdsFromChannels(nextRecipientChannels),
+    channels: getAggregateChannels(nextRecipientChannels)
+  };
+};

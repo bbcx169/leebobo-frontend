@@ -180,30 +180,63 @@ const maskContactValue = (value = '') => {
   return `${cleanValue.slice(0, 4)}***${cleanValue.slice(-4)}`;
 };
 
-const normalizeNotificationSettingsForClient = (settings = {}) => ({
-  ...settings,
-  recipients: (settings.recipients || []).map(recipient => {
-    const rawEmail = String(recipient.email || '').trim();
-    const rawLineUserId = String(recipient.lineUserId || '').trim();
-    const rawTelegramChatId = String(recipient.telegramChatId || '').trim();
-    const hasEmail = recipient.hasEmail === true || Boolean(rawEmail || recipient.emailMasked);
-    const hasLineUserId = recipient.hasLineUserId === true || Boolean(rawLineUserId || recipient.lineUserIdMasked);
-    const hasTelegramChatId = recipient.hasTelegramChatId === true || Boolean(rawTelegramChatId || recipient.telegramChatIdMasked);
+const normalizeNotificationSettingsForClient = (settings = {}) => {
+  const rules = settings.rules || {};
+  return {
+    ...settings,
+    rules: Object.fromEntries(Object.entries(rules).map(([eventKey, rule]) => [
+      eventKey,
+      normalizeNotificationRuleForClient(rule)
+    ])),
+    recipients: (settings.recipients || []).map(recipient => {
+      const rawEmail = String(recipient.email || '').trim();
+      const rawLineUserId = String(recipient.lineUserId || '').trim();
+      const rawTelegramChatId = String(recipient.telegramChatId || '').trim();
+      const hasEmail = recipient.hasEmail === true || Boolean(rawEmail || recipient.emailMasked);
+      const hasLineUserId = recipient.hasLineUserId === true || Boolean(rawLineUserId || recipient.lineUserIdMasked);
+      const hasTelegramChatId = recipient.hasTelegramChatId === true || Boolean(rawTelegramChatId || recipient.telegramChatIdMasked);
 
-    return {
-      ...recipient,
-      email: '',
-      lineUserId: '',
-      telegramChatId: '',
-      hasEmail,
-      hasLineUserId,
-      hasTelegramChatId,
-      emailMasked: recipient.emailMasked || maskContactValue(rawEmail),
-      lineUserIdMasked: recipient.lineUserIdMasked || maskContactValue(rawLineUserId),
-      telegramChatIdMasked: recipient.telegramChatIdMasked || maskContactValue(rawTelegramChatId),
-      clearEmail: false,
-      clearLineUserId: false,
-      clearTelegramChatId: false
-    };
-  })
-});
+      return {
+        ...recipient,
+        email: '',
+        lineUserId: '',
+        telegramChatId: '',
+        hasEmail,
+        hasLineUserId,
+        hasTelegramChatId,
+        emailMasked: recipient.emailMasked || maskContactValue(rawEmail),
+        lineUserIdMasked: recipient.lineUserIdMasked || maskContactValue(rawLineUserId),
+        telegramChatIdMasked: recipient.telegramChatIdMasked || maskContactValue(rawTelegramChatId),
+        clearEmail: false,
+        clearLineUserId: false,
+        clearTelegramChatId: false
+      };
+    })
+  };
+};
+
+const normalizeNotificationRuleForClient = (rule = {}) => {
+  const recipientChannels = rule.recipientChannels && Object.keys(rule.recipientChannels).length
+    ? rule.recipientChannels
+    : Object.fromEntries((rule.recipientIds || []).map(recipientId => [
+      recipientId,
+      {
+        email: rule.channels?.email === true,
+        line: rule.channels?.line === true,
+        telegram: rule.channels?.telegram === true
+      }
+    ]));
+
+  return {
+    ...rule,
+    recipientChannels,
+    recipientIds: Object.entries(recipientChannels)
+      .filter(([, channels]) => channels?.email || channels?.line || channels?.telegram)
+      .map(([recipientId]) => recipientId),
+    channels: {
+      email: Object.values(recipientChannels).some(channels => channels?.email === true),
+      line: Object.values(recipientChannels).some(channels => channels?.line === true),
+      telegram: Object.values(recipientChannels).some(channels => channels?.telegram === true)
+    }
+  };
+};
