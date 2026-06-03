@@ -70,30 +70,30 @@ function fetchOrdersByEventDate(eventDate) {
 
 function buildShippingReminderMessage(displayDate, orders) {
   if (!orders.length) {
-    return 'Daily shipping reminder - ' + displayDate + '\nNo orders scheduled for tomorrow.';
+    return '每日出貨提醒 - ' + displayDate + '\n明日沒有排定訂單。';
   }
 
   const totals = buildShippingReminderTotals(orders);
   const lines = [
-    'Daily shipping reminder - ' + displayDate,
-    'Orders: ' + orders.length,
-    'Candy total: ' + totals.candyQty,
-    'Broom rental: ' + totals.broomQty,
+    '每日出貨提醒 - ' + displayDate,
+    '訂單數：' + orders.length,
+    '糖葫蘆總數：' + totals.candyQty,
+    '掃帚租借數：' + totals.broomQty,
     ''
   ];
 
   orders.forEach(function(order, index) {
     lines.push(
       String(index + 1) + '. ' +
-      String(order.eventTime || 'No time') + ' | ' +
-      String(order.orderNumber || 'No order number') + ' | ' +
-      String(order.ordererName || 'No customer name')
+      String(order.eventTime || '未設定時間') + ' | ' +
+      String(order.orderNumber || '未設定訂單編號') + ' | ' +
+      String(order.ordererName || '未設定訂購人')
     );
-    lines.push('   Location: ' + String(order.deliveryCity || '') + ' ' + String(order.locationName || '').trim());
-    lines.push('   Items: ' + String(order.itemsList || 'No item details').replace(/\n/g, '; '));
-    lines.push('   Total: ' + String(order.totalAmount || 0));
+    lines.push('   地點：' + String(order.deliveryCity || '') + ' ' + String(order.locationName || '').trim());
+    lines.push('   品項：' + String(order.itemsList || '無品項明細').replace(/\n/g, '; '));
+    lines.push('   金額：' + String(order.totalAmount || 0));
     if (order.pdfDownloadUrl) {
-      lines.push('   PDF: ' + order.pdfDownloadUrl);
+      lines.push('   PDF：' + order.pdfDownloadUrl);
     }
   });
 
