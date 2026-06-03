@@ -27,9 +27,10 @@ const ADMIN_ACTIONS = [
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
+    let authResult = null;
 
     if (ADMIN_ACTIONS.indexOf(data.action) !== -1) {
-      requireFirebaseAdmin(data);
+      authResult = requireFirebaseAdmin(data);
     }
 
     switch (data.action) {
@@ -40,16 +41,16 @@ function doPost(e) {
         return handleSaveSettings(data);
 
       case 'get_notification_settings':
-        return jsonResponse({ status: 'success', data: getNotificationSettingsForAdmin() });
+        return jsonResponse({ status: 'success', data: getNotificationSettingsForAdmin(authResult) });
 
       case 'save_notification_settings':
-        return handleSaveNotificationSettings(data);
+        return handleSaveNotificationSettings(data, authResult);
 
       case 'test_notification':
-        return handleTestNotification(data);
+        return handleTestNotification(data, authResult);
 
       case 'get_notification_logs':
-        return jsonResponse({ status: 'success', data: getNotificationLogs(data.limit || 30) });
+        return jsonResponse({ status: 'success', data: getNotificationLogs(data.limit || 30, authResult) });
 
       case 'admin_resend_pdf':
       case 'resendPdf':
@@ -92,17 +93,17 @@ function handleSaveSettings(data) {
   }
 }
 
-function handleSaveNotificationSettings(data) {
+function handleSaveNotificationSettings(data, authResult) {
   try {
-    return jsonResponse({ status: 'success', data: saveNotificationSettings(data.settings || data) });
+    return jsonResponse({ status: 'success', data: saveNotificationSettings(data.settings || data, authResult) });
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
   }
 }
 
-function handleTestNotification(data) {
+function handleTestNotification(data, authResult) {
   try {
-    return jsonResponse({ status: 'success', data: sendTestNotification(data) });
+    return jsonResponse({ status: 'success', data: sendTestNotification(data, authResult) });
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
   }

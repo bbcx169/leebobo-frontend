@@ -48,6 +48,7 @@ function verifyFirebaseAdminIdToken(idToken) {
       isAdmin: customAttributes.admin === true,
       uid: user.localId,
       email: user.email || '',
+      role: String(customAttributes.role || 'admin').toLowerCase(),
       message: customAttributes.admin === true ? '' : 'Firebase 使用者沒有 admin custom claim。'
     };
   } catch (err) {

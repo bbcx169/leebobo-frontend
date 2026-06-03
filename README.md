@@ -208,16 +208,22 @@ leebobo-frontend
 firebase-adminsdk-fbsvc@leebobo-frontend.iam.gserviceaccount.com
 ```
 
-7. 設定該 Email 為後台管理員：
+7. 設定該 Email 為後台管理員。一般共同管理者使用 `admin` role：
 
 ```powershell
-npm.cmd run admin:set-claim -- admin@example.com true
+npm.cmd run admin:set-claim -- admin@example.com true admin
+```
+
+主要管理者使用 `owner` role：
+
+```powershell
+npm.cmd run admin:set-claim -- owner@example.com true owner
 ```
 
 成功時會看到：
 
 ```text
-Updated custom claims for admin@example.com: admin=true
+Updated custom claims for admin@example.com: admin=true role=admin
 The user must sign out and sign in again to refresh the ID token.
 ```
 
@@ -234,20 +240,22 @@ $env:FIREBASE_PROJECT_ID="leebobo-frontend"
 
 4. 對該 user 設定管理員 claim：
 
+設定主要管理者 owner：
+
 ```powershell
-npm.cmd run admin:set-claim -- 你的GoogleEmail@gmail.com true
+npm.cmd run admin:set-claim -- 你的GoogleEmail@gmail.com true owner
 ```
 
-或：
+設定一般後台管理者 admin：
 
 ```powershell
-npm.cmd run admin:set-claim -- admin@example.com true
+npm.cmd run admin:set-claim -- admin@example.com true admin
 ```
 
 5. 回到後台，按「登出並切換帳號」。
 6. 重新用同一個 Google 帳戶或 Email/Password 帳號登入。
 
-重點：設定 custom claim 後，舊 token 不會立刻更新，所以一定要登出再登入，ID token 才會帶入 `admin: true`。
+重點：設定 custom claim 後，舊 token 不會立刻更新，所以一定要登出再登入，ID token 才會帶入 `admin: true` 與 `role`。
 
 #### GAS admin token 驗證
 
@@ -339,6 +347,15 @@ reminderTime
 後台「每日出貨提醒排程設定」只控制每日提醒是否啟用與發送時間；實際通知通道與收件人由「通知規則設定」決定。「通知規則設定」可管理共同管理者、事件是否啟用、每位管理者在各事件中的 Email / LINE / Telegram 通道、測試通知與通知紀錄。通知設定儲存在 Firestore `settings/notificationSettings`，發送紀錄寫入 `notificationLogs`。完整 Email、LINE userId、Telegram chatId 只由 GAS 讀寫；後台讀取設定時只回傳遮罩值與是否已設定，輸入框留空代表保留原值，勾選清除才會刪除該通道設定。通知紀錄保留最近 60 天，後台固定高度顯示最近 30 筆。
 
 通知規則以 `recipientChannels` 作為唯一權威設定，結構為「事件 -> 每位收件人 -> 各自可用通道」。前端儲存時只送出 `enabled` 與 `recipientChannels`；GAS 讀取、儲存、回傳與實際發送也只使用 `recipientChannels`，不再使用舊版 `channels` / `recipientIds`。
+
+通知規則設定依 Firebase custom claim `role` 控制顯示與修改範圍：
+
+| 角色 | 可見範圍 | 可修改範圍 |
+|---|---|---|
+| `owner` | 所有共同管理者與所有事件通道 | 可新增 / 移除管理者、設定後台登入 Email、修改所有通知通道 |
+| `admin` | 只看到後台登入 Email 對應自己的通知收件人 | 只能修改自己的 Email / LINE / Telegram 聯絡資料與自己的事件通道 |
+
+owner 需在共同管理者卡片中設定「後台登入 Email」，一般 admin 才能被對應到自己的通知設定。若未設定，GAS 會退回比對通知 Email；仍建議明確填寫 `authEmail`。
 
 若 Firestore `settings/notificationSettings` 仍有舊版 `channels` / `recipientIds` 欄位，可在已設定 Firebase Admin SDK 環境變數後執行一次 migration：
 

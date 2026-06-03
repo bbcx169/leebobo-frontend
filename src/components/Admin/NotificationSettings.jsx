@@ -42,6 +42,7 @@ export default function NotificationSettings({
   const recipients = settings.recipients || [];
   const rules = settings.rules || {};
   const events = (settings.events || []).filter(event => event.key !== 'testNotification');
+  const canManageAllRecipients = settings.canManageAllRecipients === true;
 
   const updateRecipient = (recipientId, updates) => {
     setSettings({
@@ -65,6 +66,7 @@ export default function NotificationSettings({
           email: '',
           lineUserId: '',
           telegramChatId: '',
+          authEmail: '',
           emailMasked: '',
           lineUserIdMasked: '',
           telegramChatIdMasked: '',
@@ -190,6 +192,7 @@ export default function NotificationSettings({
             <button
               type="button"
               onClick={addRecipient}
+              disabled={!canManageAllRecipients}
               className="px-5 py-2 bg-gray-800 text-white font-bold rounded-xl hover:bg-black transition-colors"
             >
               新增管理者
@@ -205,10 +208,22 @@ export default function NotificationSettings({
                       <span className="block text-sm font-bold text-gray-500 mb-1">名稱</span>
                       <input
                         value={recipient.name || ''}
+                        disabled={!canManageAllRecipients}
                         onChange={e => updateRecipient(recipient.id, { name: e.target.value })}
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amberRed"
+                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amberRed disabled:opacity-60"
                       />
                     </label>
+                    {canManageAllRecipients && (
+                      <label className="block">
+                        <span className="block text-sm font-bold text-gray-500 mb-1">後台登入 Email</span>
+                        <input
+                          value={recipient.authEmail || ''}
+                          onChange={e => updateRecipient(recipient.id, { authEmail: e.target.value })}
+                          placeholder="用來限制一般 admin 只能看到自己的設定"
+                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amberRed"
+                        />
+                      </label>
+                    )}
                     {CHANNELS.map(channel => (
                       <React.Fragment key={channel.key}>
                         {renderContactInput(recipient, channel)}
@@ -221,15 +236,16 @@ export default function NotificationSettings({
                       <input
                         type="checkbox"
                         checked={recipient.enabled !== false}
+                        disabled={!canManageAllRecipients}
                         onChange={e => updateRecipient(recipient.id, { enabled: e.target.checked })}
-                        className="w-5 h-5 accent-amberRed"
+                        className="w-5 h-5 accent-amberRed disabled:opacity-60"
                       />
                       啟用
                     </label>
                     <button
                       type="button"
                       onClick={() => removeRecipient(recipient.id)}
-                      disabled={recipients.length <= 1}
+                      disabled={!canManageAllRecipients || recipients.length <= 1}
                       className="px-4 py-2 text-red-600 bg-red-50 border border-red-100 font-bold rounded-xl disabled:opacity-40"
                     >
                       移除

@@ -54,17 +54,19 @@ function getNotificationSettings() {
   return normalizeNotificationSettings(firestoreDocumentToPlainObject(document));
 }
 
-function getNotificationSettingsForAdmin() {
-  return maskNotificationSettingsForAdmin(getNotificationSettings());
+function getNotificationSettingsForAdmin(authResult) {
+  return maskNotificationSettingsForAdmin(scopeNotificationSettingsForAuth(getNotificationSettings(), authResult), authResult);
 }
 
-function saveNotificationSettings(settings) {
+function saveNotificationSettings(settings, authResult) {
   const currentSettings = getNotificationSettings();
-  const mergedSettings = mergeNotificationSettingsForSave(currentSettings, settings || {});
+  const mergedSettings = isNotificationOwner(authResult)
+    ? mergeNotificationSettingsForSave(currentSettings, settings || {})
+    : mergeOwnNotificationSettingsForSave(currentSettings, settings || {}, authResult);
   const normalizedSettings = normalizeNotificationSettings(mergedSettings);
   normalizedSettings.updatedAt = new Date();
   setFirestoreDocument(NOTIFICATION_SETTINGS_COLLECTION, NOTIFICATION_SETTINGS_DOCUMENT, normalizedSettings);
-  return maskNotificationSettingsForAdmin(normalizeNotificationSettings(normalizedSettings));
+  return maskNotificationSettingsForAdmin(scopeNotificationSettingsForAuth(normalizeNotificationSettings(normalizedSettings), authResult), authResult);
 }
 
 function dispatchAdminNotification(eventKey, messageText, options) {
@@ -131,7 +133,7 @@ function dispatchAdminNotification(eventKey, messageText, options) {
   return results;
 }
 
-function sendTestNotification(data) {
+function sendTestNotification(data, authResult) {
   const settings = getNotificationSettings();
   const recipient = (settings.recipients || []).filter(function(item) {
     return item.id === data.recipientId;
@@ -139,6 +141,9 @@ function sendTestNotification(data) {
   const channel = String(data.channel || '').trim();
 
   if (!recipient) throw new Error('Recipient not found.');
+  if (!isNotificationOwner(authResult) && !isRecipientOwnedByAuth(recipient, authResult)) {
+    throw new Error('只能測試自己的通知設定。');
+  }
   if (['email', 'line', 'telegram'].indexOf(channel) === -1) throw new Error('Unsupported notification channel.');
 
   const target = getRecipientTarget(recipient, channel);
@@ -176,7 +181,9 @@ function sendTestNotification(data) {
   }
 }
 
-function getNotificationLogs(limitCount) {
+function getNotificationLogs(limitCount, authResult) {
+  const settings = getNotificationSettings();
+  const ownRecipient = getRecipientForAuth(settings, authResult);
   const result = runFirestoreQuery({
     from: [{ collectionId: NOTIFICATION_LOGS_COLLECTION }],
     orderBy: [
@@ -187,7 +194,10 @@ function getNotificationLogs(limitCount) {
 
   return result
     .filter(function(item) { return item.document; })
-    .map(function(item) { return firestoreDocumentToPlainObject(item.document); });
+    .map(function(item) { return firestoreDocumentToPlainObject(item.document); })
+    .filter(function(log) {
+      return isNotificationOwner(authResult) || (ownRecipient && log.recipientId === ownRecipient.id);
+    });
 }
 
 function sendNotificationChannel(channel, target, subject, messageText, attachments) {
@@ -321,6 +331,7 @@ function getDefaultNotificationSettings() {
     id: 'owner',
     name: '主要管理者',
     enabled: true,
+    authEmail: String(notifyEmail || '').trim().toLowerCase(),
     email: notifyEmail || '',
     lineUserId: Array.isArray(lineUserId) ? String(lineUserId[0] || '') : String(lineUserId || ''),
     telegramChatId: String(telegramChatId || '')
@@ -372,6 +383,7 @@ function normalizeNotificationSettings(settings) {
       id: String(recipient.id || ('recipient_' + (index + 1))).trim(),
       name: String(recipient.name || '').trim(),
       enabled: recipient.enabled !== false,
+      authEmail: String(recipient.authEmail || '').trim().toLowerCase(),
       email: String(recipient.email || '').trim(),
       lineUserId: String(recipient.lineUserId || '').trim(),
       telegramChatId: String(recipient.telegramChatId || '').trim()
@@ -415,6 +427,7 @@ function mergeNotificationSettingsForSave(currentSettings, incomingSettings) {
       id: recipientId || ('recipient_' + new Date().getTime()),
       name: String(incomingRecipient.name || existingRecipient.name || '').trim(),
       enabled: incomingRecipient.enabled !== false,
+      authEmail: String(incomingRecipient.authEmail || existingRecipient.authEmail || '').trim().toLowerCase(),
       email: mergeSensitiveContactValue(existingRecipient.email, incomingRecipient.email, incomingRecipient.clearEmail),
       lineUserId: mergeSensitiveContactValue(existingRecipient.lineUserId, incomingRecipient.lineUserId, incomingRecipient.clearLineUserId),
       telegramChatId: mergeSensitiveContactValue(existingRecipient.telegramChatId, incomingRecipient.telegramChatId, incomingRecipient.clearTelegramChatId)
@@ -428,6 +441,51 @@ function mergeNotificationSettingsForSave(currentSettings, incomingSettings) {
   };
 }
 
+function mergeOwnNotificationSettingsForSave(currentSettings, incomingSettings, authResult) {
+  const ownRecipient = getRecipientForAuth(currentSettings, authResult);
+  if (!ownRecipient) {
+    throw new Error('找不到與登入 Email 對應的通知收件人，請 owner 先設定 authEmail。');
+  }
+
+  const incomingRecipient = (incomingSettings.recipients || []).filter(function(recipient) {
+    return recipient.id === ownRecipient.id;
+  })[0] || {};
+  const mergedRecipients = (currentSettings.recipients || []).map(function(recipient) {
+    if (recipient.id !== ownRecipient.id) return recipient;
+    return {
+      id: recipient.id,
+      name: recipient.name,
+      enabled: recipient.enabled !== false,
+      authEmail: recipient.authEmail || '',
+      email: mergeSensitiveContactValue(recipient.email, incomingRecipient.email, incomingRecipient.clearEmail),
+      lineUserId: mergeSensitiveContactValue(recipient.lineUserId, incomingRecipient.lineUserId, incomingRecipient.clearLineUserId),
+      telegramChatId: mergeSensitiveContactValue(recipient.telegramChatId, incomingRecipient.telegramChatId, incomingRecipient.clearTelegramChatId)
+    };
+  });
+
+  const incomingRules = incomingSettings.rules || {};
+  const mergedRules = {};
+  Object.keys(currentSettings.rules || {}).forEach(function(eventKey) {
+    const currentRule = currentSettings.rules[eventKey] || {};
+    const incomingRule = incomingRules[eventKey] || {};
+    const recipientChannels = Object.assign({}, currentRule.recipientChannels || {});
+    const ownChannels = incomingRule.recipientChannels && incomingRule.recipientChannels[ownRecipient.id];
+    if (ownChannels) {
+      recipientChannels[ownRecipient.id] = normalizeRecipientChannelMap(ownChannels);
+    }
+    mergedRules[eventKey] = {
+      enabled: currentRule.enabled !== false,
+      recipientChannels: recipientChannels
+    };
+  });
+
+  return {
+    recipients: mergedRecipients,
+    rules: mergedRules,
+    updatedAt: currentSettings.updatedAt || ''
+  };
+}
+
 function mergeSensitiveContactValue(existingValue, incomingValue, shouldClear) {
   if (shouldClear === true) return '';
   const cleanIncomingValue = String(incomingValue || '').trim();
@@ -435,12 +493,73 @@ function mergeSensitiveContactValue(existingValue, incomingValue, shouldClear) {
   return String(existingValue || '').trim();
 }
 
-function maskNotificationSettingsForAdmin(settings) {
+function scopeNotificationSettingsForAuth(settings, authResult) {
+  const normalizedSettings = normalizeNotificationSettings(settings);
+  if (isNotificationOwner(authResult)) return normalizedSettings;
+
+  const ownRecipient = getRecipientForAuth(normalizedSettings, authResult);
+  if (!ownRecipient) {
+    return {
+      events: normalizedSettings.events,
+      recipients: [],
+      rules: scopeRulesToRecipient(normalizedSettings.rules, ''),
+      updatedAt: normalizedSettings.updatedAt || ''
+    };
+  }
+
+  return {
+    events: normalizedSettings.events,
+    recipients: [ownRecipient],
+    rules: scopeRulesToRecipient(normalizedSettings.rules, ownRecipient.id),
+    updatedAt: normalizedSettings.updatedAt || ''
+  };
+}
+
+function scopeRulesToRecipient(rules, recipientId) {
+  const scopedRules = {};
+  Object.keys(rules || {}).forEach(function(eventKey) {
+    const rule = rules[eventKey] || {};
+    const recipientChannels = {};
+    if (recipientId && rule.recipientChannels && rule.recipientChannels[recipientId]) {
+      recipientChannels[recipientId] = rule.recipientChannels[recipientId];
+    }
+    scopedRules[eventKey] = {
+      enabled: rule.enabled !== false,
+      recipientChannels: recipientChannels
+    };
+  });
+  return scopedRules;
+}
+
+function isNotificationOwner(authResult) {
+  return authResult && String(authResult.role || '').toLowerCase() === 'owner';
+}
+
+function getRecipientForAuth(settings, authResult) {
+  const email = authResult && authResult.email ? String(authResult.email).trim().toLowerCase() : '';
+  if (!email) return null;
+  return (settings.recipients || []).filter(function(recipient) {
+    return isRecipientOwnedByAuth(recipient, authResult);
+  })[0] || null;
+}
+
+function isRecipientOwnedByAuth(recipient, authResult) {
+  const email = authResult && authResult.email ? String(authResult.email).trim().toLowerCase() : '';
+  if (!email || !recipient) return false;
+  const authEmail = String(recipient.authEmail || '').trim().toLowerCase();
+  const notificationEmail = String(recipient.email || '').trim().toLowerCase();
+  return authEmail === email || (!authEmail && notificationEmail === email);
+}
+
+function maskNotificationSettingsForAdmin(settings, authResult) {
   const normalizedSettings = normalizeNotificationSettings(settings);
   return {
     events: normalizedSettings.events,
     rules: normalizedSettings.rules,
     updatedAt: normalizedSettings.updatedAt || '',
+    scope: isNotificationOwner(authResult) ? 'owner' : 'self',
+    currentUserEmail: authResult && authResult.email ? String(authResult.email).toLowerCase() : '',
+    canManageAllRecipients: isNotificationOwner(authResult),
     recipients: (normalizedSettings.recipients || []).map(function(recipient) {
       const email = String(recipient.email || '').trim();
       const lineUserId = String(recipient.lineUserId || '').trim();
@@ -449,6 +568,7 @@ function maskNotificationSettingsForAdmin(settings) {
         id: recipient.id,
         name: recipient.name,
         enabled: recipient.enabled !== false,
+        authEmail: isNotificationOwner(authResult) ? (recipient.authEmail || '') : '',
         email: '',
         lineUserId: '',
         telegramChatId: '',
@@ -475,6 +595,7 @@ function getDefaultNotificationSettingsBase() {
       id: 'owner',
       name: '主要管理者',
       enabled: true,
+      authEmail: String(notifyEmail || '').trim().toLowerCase(),
       email: notifyEmail || '',
       lineUserId: Array.isArray(lineUserId) ? String(lineUserId[0] || '') : String(lineUserId || ''),
       telegramChatId: String(telegramChatId || '')
