@@ -155,8 +155,9 @@ export const fetchNotificationSettings = async () => {
 };
 
 export const saveNotificationSettings = async (settings) => {
-  const result = await callGasApi({ action: 'save_notification_settings', settings });
-  return normalizeNotificationSettingsForClient(result.data);
+  const submittedSettings = prepareNotificationSettingsForSave(settings);
+  const result = await callGasApi({ action: 'save_notification_settings', settings: submittedSettings });
+  return normalizeNotificationSettingsForClient(mergeReturnedNotificationSettings(submittedSettings, result.data));
 };
 
 export const sendTestNotification = async ({ recipientId, channel }) => {
@@ -220,11 +221,7 @@ const normalizeNotificationRuleForClient = (rule = {}) => {
     ? rule.recipientChannels
     : Object.fromEntries((rule.recipientIds || []).map(recipientId => [
       recipientId,
-      {
-        email: rule.channels?.email === true,
-        line: rule.channels?.line === true,
-        telegram: rule.channels?.telegram === true
-      }
+      getLegacyRecipientChannels(rule.channels || {})
     ]));
 
   return {
@@ -238,5 +235,44 @@ const normalizeNotificationRuleForClient = (rule = {}) => {
       line: Object.values(recipientChannels).some(channels => channels?.line === true),
       telegram: Object.values(recipientChannels).some(channels => channels?.telegram === true)
     }
+  };
+};
+
+const prepareNotificationSettingsForSave = (settings = {}) => ({
+  ...settings,
+  rules: Object.fromEntries(Object.entries(settings.rules || {}).map(([eventKey, rule]) => [
+    eventKey,
+    {
+      enabled: rule.enabled !== false,
+      recipientChannels: rule.recipientChannels || {}
+    }
+  ]))
+});
+
+const getLegacyRecipientChannels = (channels = {}) => ({
+  email: channels.email === true,
+  line: channels.line === true,
+  telegram: channels.telegram === true
+});
+
+const mergeReturnedNotificationSettings = (submittedSettings = {}, returnedSettings = {}) => {
+  const submittedRules = submittedSettings.rules || {};
+  const returnedRules = returnedSettings.rules || {};
+  return {
+    ...returnedSettings,
+    rules: Object.fromEntries(Object.entries(returnedRules).map(([eventKey, returnedRule]) => {
+      const submittedRule = submittedRules[eventKey] || {};
+      return [
+        eventKey,
+        returnedRule.recipientChannels && Object.keys(returnedRule.recipientChannels).length
+          ? returnedRule
+          : {
+            ...returnedRule,
+            recipientChannels: submittedRule.recipientChannels || {},
+            recipientIds: submittedRule.recipientIds || returnedRule.recipientIds || [],
+            channels: submittedRule.channels || returnedRule.channels || {}
+          }
+      ];
+    }))
   };
 };

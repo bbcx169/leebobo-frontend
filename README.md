@@ -182,6 +182,49 @@ Email/Password 帳號：
 - 手動新增 Email/Password user，或讓使用者透過未來的註冊流程建立帳號。
 - 確認該 user 的 Email。
 
+新增 Email/Password 後台管理者完整流程：
+
+1. 到 Firebase Console → Authentication → Users → 新增使用者。
+2. 輸入管理者 Email 與初始密碼。
+3. 到專案設定 → 服務帳戶 → Firebase Admin SDK，確認目前專案是 `leebobo-frontend`。
+4. 點「產生新的私密金鑰」下載 service account JSON；此檔不得 commit。
+5. 在 PowerShell 設定環境變數：
+
+```powershell
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\Users\你的帳號\Downloads\leebobo-frontend-firebase-adminsdk-xxxx.json"
+$env:FIREBASE_PROJECT_ID="leebobo-frontend"
+```
+
+6. 檢查 service account JSON 是否屬於正確專案。路徑可改用 `/`，避免 JavaScript 字串中的 `\` 被誤判：
+
+```powershell
+node -e "const fs=require('fs'); const p='C:/Users/你的帳號/Downloads/leebobo-frontend-firebase-adminsdk-xxxx.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); console.log(j.project_id); console.log(j.client_email);"
+```
+
+正確時應輸出：
+
+```text
+leebobo-frontend
+firebase-adminsdk-fbsvc@leebobo-frontend.iam.gserviceaccount.com
+```
+
+7. 設定該 Email 為後台管理員：
+
+```powershell
+npm.cmd run admin:set-claim -- admin@example.com true
+```
+
+成功時會看到：
+
+```text
+Updated custom claims for admin@example.com: admin=true
+The user must sign out and sign in again to refresh the ID token.
+```
+
+8. 請該管理者到後台登出，並用 Email/Password 重新登入。
+
+PowerShell 若出現 `>>`，代表前一行引號或括號沒有關好；按 `Ctrl + C` 回到正常提示符號後，重新貼上單行指令。
+
 3. 準備 Firebase Admin SDK service account JSON，並設定本機 PowerShell 環境變數：
 
 ```powershell
@@ -294,6 +337,8 @@ reminderTime
 ### 管理者通知時機
 
 後台「每日出貨提醒排程設定」只控制每日提醒是否啟用與發送時間；實際通知通道與收件人由「通知規則設定」決定。「通知規則設定」可管理共同管理者、事件是否啟用、每位管理者在各事件中的 Email / LINE / Telegram 通道、測試通知與通知紀錄。通知設定儲存在 Firestore `settings/notificationSettings`，發送紀錄寫入 `notificationLogs`。完整 Email、LINE userId、Telegram chatId 只由 GAS 讀寫；後台讀取設定時只回傳遮罩值與是否已設定，輸入框留空代表保留原值，勾選清除才會刪除該通道設定。通知紀錄保留最近 60 天，後台固定高度顯示最近 30 筆。
+
+通知規則以 `recipientChannels` 作為唯一權威設定，結構為「事件 -> 每位收件人 -> 各自可用通道」。前端儲存時只送出 `enabled` 與 `recipientChannels`；`channels` / `recipientIds` 僅作為 GAS 端讀取舊資料時的 migration fallback 或衍生相容欄位，不再用來決定後台勾選狀態。
 
 | 時機 | 主要管理者預設 Email | 主要管理者預設 LINE | 主要管理者預設 Telegram | 發送通知內容 | 觸發條件 / 備註 |
 |---|---:|---:|---:|---|---|

@@ -119,9 +119,7 @@ export default function NotificationSettings({
     }
 
     updateRule(eventKey, {
-      recipientChannels: nextRecipientChannels,
-      recipientIds: getRecipientIdsFromChannels(nextRecipientChannels),
-      channels: getAggregateChannels(nextRecipientChannels)
+      recipientChannels: nextRecipientChannels
     });
   };
 
@@ -383,24 +381,11 @@ export default function NotificationSettings({
 
 const hasAnyEnabledChannel = (channels = {}) => CHANNELS.some(channel => channels[channel.key] === true);
 
-const getRecipientIdsFromChannels = (recipientChannels = {}) => (
-  Object.entries(recipientChannels)
-    .filter(([, channels]) => hasAnyEnabledChannel(channels))
-    .map(([recipientId]) => recipientId)
-);
-
-const getAggregateChannels = (recipientChannels = {}) => CHANNELS.reduce((aggregate, channel) => ({
-  ...aggregate,
-  [channel.key]: Object.values(recipientChannels).some(channels => channels?.[channel.key] === true)
-}), {});
-
 const removeRuleRecipient = (rule = {}, recipientId) => {
   const nextRecipientChannels = { ...(rule.recipientChannels || {}) };
   delete nextRecipientChannels[recipientId];
   return {
     ...rule,
-    recipientChannels: nextRecipientChannels,
-    recipientIds: getRecipientIdsFromChannels(nextRecipientChannels),
-    channels: getAggregateChannels(nextRecipientChannels)
+    recipientChannels: nextRecipientChannels
   };
 };
