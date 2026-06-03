@@ -338,7 +338,17 @@ reminderTime
 
 後台「每日出貨提醒排程設定」只控制每日提醒是否啟用與發送時間；實際通知通道與收件人由「通知規則設定」決定。「通知規則設定」可管理共同管理者、事件是否啟用、每位管理者在各事件中的 Email / LINE / Telegram 通道、測試通知與通知紀錄。通知設定儲存在 Firestore `settings/notificationSettings`，發送紀錄寫入 `notificationLogs`。完整 Email、LINE userId、Telegram chatId 只由 GAS 讀寫；後台讀取設定時只回傳遮罩值與是否已設定，輸入框留空代表保留原值，勾選清除才會刪除該通道設定。通知紀錄保留最近 60 天，後台固定高度顯示最近 30 筆。
 
-通知規則以 `recipientChannels` 作為唯一權威設定，結構為「事件 -> 每位收件人 -> 各自可用通道」。前端儲存時只送出 `enabled` 與 `recipientChannels`；`channels` / `recipientIds` 僅作為 GAS 端讀取舊資料時的 migration fallback 或衍生相容欄位，不再用來決定後台勾選狀態。
+通知規則以 `recipientChannels` 作為唯一權威設定，結構為「事件 -> 每位收件人 -> 各自可用通道」。前端儲存時只送出 `enabled` 與 `recipientChannels`；GAS 讀取、儲存、回傳與實際發送也只使用 `recipientChannels`，不再使用舊版 `channels` / `recipientIds`。
+
+若 Firestore `settings/notificationSettings` 仍有舊版 `channels` / `recipientIds` 欄位，可在已設定 Firebase Admin SDK 環境變數後執行一次 migration：
+
+```powershell
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\Users\你的帳號\Downloads\leebobo-frontend-firebase-adminsdk-xxxx.json"
+$env:FIREBASE_PROJECT_ID="leebobo-frontend"
+npm.cmd run admin:migrate-notification-settings
+```
+
+migration 會將每個通知 rule 寫回為只包含 `enabled` 與 `recipientChannels`。
 
 | 時機 | 主要管理者預設 Email | 主要管理者預設 LINE | 主要管理者預設 Telegram | 發送通知內容 | 觸發條件 / 備註 |
 |---|---:|---:|---:|---|---|

@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "admin:set-claim": "node scripts/setAdminClaim.mjs",
+    "admin:migrate-notification-settings": "node scripts/migrateNotificationSettings.mjs",
     "clasp:login": "clasp login",
     "gas:status": "clasp status --project .",
     "gas:push": "clasp push --project . --force",

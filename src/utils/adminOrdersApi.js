@@ -217,24 +217,9 @@ const normalizeNotificationSettingsForClient = (settings = {}) => {
 };
 
 const normalizeNotificationRuleForClient = (rule = {}) => {
-  const recipientChannels = rule.recipientChannels && Object.keys(rule.recipientChannels).length
-    ? rule.recipientChannels
-    : Object.fromEntries((rule.recipientIds || []).map(recipientId => [
-      recipientId,
-      getLegacyRecipientChannels(rule.channels || {})
-    ]));
-
   return {
-    ...rule,
-    recipientChannels,
-    recipientIds: Object.entries(recipientChannels)
-      .filter(([, channels]) => channels?.email || channels?.line || channels?.telegram)
-      .map(([recipientId]) => recipientId),
-    channels: {
-      email: Object.values(recipientChannels).some(channels => channels?.email === true),
-      line: Object.values(recipientChannels).some(channels => channels?.line === true),
-      telegram: Object.values(recipientChannels).some(channels => channels?.telegram === true)
-    }
+    enabled: rule.enabled !== false,
+    recipientChannels: rule.recipientChannels || {}
   };
 };
 
@@ -249,30 +234,23 @@ const prepareNotificationSettingsForSave = (settings = {}) => ({
   ]))
 });
 
-const getLegacyRecipientChannels = (channels = {}) => ({
-  email: channels.email === true,
-  line: channels.line === true,
-  telegram: channels.telegram === true
-});
-
 const mergeReturnedNotificationSettings = (submittedSettings = {}, returnedSettings = {}) => {
   const submittedRules = submittedSettings.rules || {};
   const returnedRules = returnedSettings.rules || {};
+  const mergedRules = {
+    ...returnedRules,
+    ...Object.fromEntries(Object.entries(submittedRules).map(([eventKey, submittedRule]) => [
+      eventKey,
+      {
+        ...(returnedRules[eventKey] || {}),
+        enabled: submittedRule.enabled !== false,
+        recipientChannels: submittedRule.recipientChannels || {}
+      }
+    ]))
+  };
+
   return {
     ...returnedSettings,
-    rules: Object.fromEntries(Object.entries(returnedRules).map(([eventKey, returnedRule]) => {
-      const submittedRule = submittedRules[eventKey] || {};
-      return [
-        eventKey,
-        returnedRule.recipientChannels && Object.keys(returnedRule.recipientChannels).length
-          ? returnedRule
-          : {
-            ...returnedRule,
-            recipientChannels: submittedRule.recipientChannels || {},
-            recipientIds: submittedRule.recipientIds || returnedRule.recipientIds || [],
-            channels: submittedRule.channels || returnedRule.channels || {}
-          }
-      ];
-    }))
+    rules: mergedRules
   };
 };

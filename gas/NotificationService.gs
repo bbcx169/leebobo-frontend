@@ -331,44 +331,30 @@ function getDefaultNotificationSettings() {
     rules: {
       newOrder: {
         enabled: true,
-        channels: { email: true, line: true, telegram: true },
-        recipientIds: ['owner'],
         recipientChannels: { owner: { email: true, line: true, telegram: true } }
       },
       dailyShippingReminder: {
         enabled: true,
-        channels: { email: false, line: false, telegram: true },
-        recipientIds: ['owner'],
         recipientChannels: { owner: { email: false, line: false, telegram: true } }
       },
       orderUpdated: {
         enabled: false,
-        channels: { email: false, line: false, telegram: true },
-        recipientIds: ['owner'],
         recipientChannels: { owner: { email: false, line: false, telegram: true } }
       },
       orderDeleted: {
         enabled: false,
-        channels: { email: false, line: false, telegram: true },
-        recipientIds: ['owner'],
         recipientChannels: { owner: { email: false, line: false, telegram: true } }
       },
       resendPdf: {
         enabled: false,
-        channels: { email: false, line: false, telegram: true },
-        recipientIds: ['owner'],
         recipientChannels: { owner: { email: false, line: false, telegram: true } }
       },
       sheetSyncFailed: {
         enabled: true,
-        channels: { email: true, line: false, telegram: true },
-        recipientIds: ['owner'],
         recipientChannels: { owner: { email: true, line: false, telegram: true } }
       },
       notificationFailed: {
         enabled: false,
-        channels: { email: false, line: false, telegram: true },
-        recipientIds: ['owner'],
         recipientChannels: { owner: { email: false, line: false, telegram: true } }
       }
     },
@@ -402,8 +388,6 @@ function normalizeNotificationSettings(settings) {
       const recipientChannels = normalizeRuleRecipientChannels(sourceRule, defaultRule);
       normalizedRules[eventDefinition.key] = {
         enabled: typeof sourceRule.enabled === 'undefined' ? defaultRule.enabled !== false : sourceRule.enabled !== false,
-        channels: getAggregateRuleChannels(recipientChannels),
-        recipientIds: Object.keys(recipientChannels),
         recipientChannels: recipientChannels
       };
     });
@@ -496,13 +480,13 @@ function getDefaultNotificationSettingsBase() {
       telegramChatId: String(telegramChatId || '')
     }],
     rules: {
-      newOrder: { enabled: true, channels: { email: true, line: true, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: true, line: true, telegram: true } } },
-      dailyShippingReminder: { enabled: true, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: false, line: false, telegram: true } } },
-      orderUpdated: { enabled: false, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: false, line: false, telegram: true } } },
-      orderDeleted: { enabled: false, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: false, line: false, telegram: true } } },
-      resendPdf: { enabled: false, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: false, line: false, telegram: true } } },
-      sheetSyncFailed: { enabled: true, channels: { email: true, line: false, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: true, line: false, telegram: true } } },
-      notificationFailed: { enabled: false, channels: { email: false, line: false, telegram: true }, recipientIds: ['owner'], recipientChannels: { owner: { email: false, line: false, telegram: true } } }
+      newOrder: { enabled: true, recipientChannels: { owner: { email: true, line: true, telegram: true } } },
+      dailyShippingReminder: { enabled: true, recipientChannels: { owner: { email: false, line: false, telegram: true } } },
+      orderUpdated: { enabled: false, recipientChannels: { owner: { email: false, line: false, telegram: true } } },
+      orderDeleted: { enabled: false, recipientChannels: { owner: { email: false, line: false, telegram: true } } },
+      resendPdf: { enabled: false, recipientChannels: { owner: { email: false, line: false, telegram: true } } },
+      sheetSyncFailed: { enabled: true, recipientChannels: { owner: { email: true, line: false, telegram: true } } },
+      notificationFailed: { enabled: false, recipientChannels: { owner: { email: false, line: false, telegram: true } } }
     }
   };
 }
@@ -514,43 +498,23 @@ function normalizeRuleRecipientChannels(sourceRule, defaultRule) {
   Object.keys(sourceRecipientChannels).forEach(function(recipientId) {
     const cleanRecipientId = String(recipientId || '').trim();
     if (!cleanRecipientId) return;
-    normalized[cleanRecipientId] = normalizeChannelMap(sourceRecipientChannels[recipientId]);
+    normalized[cleanRecipientId] = normalizeRecipientChannelMap(sourceRecipientChannels[recipientId]);
   });
 
   if (Object.keys(normalized).length) {
     return normalized;
   }
 
-  const recipientIds = Array.isArray(sourceRule.recipientIds) && sourceRule.recipientIds.length
-    ? sourceRule.recipientIds
-    : (defaultRule.recipientIds || ['owner']);
-  const channels = sourceRule.channels || defaultRule.channels || {};
-  recipientIds.forEach(function(recipientId) {
-    const cleanRecipientId = String(recipientId || '').trim();
-    if (cleanRecipientId) normalized[cleanRecipientId] = normalizeChannelMap(channels);
-  });
-
-  return normalized;
+  return defaultRule.recipientChannels || {};
 }
 
-function normalizeChannelMap(channels) {
-  const sourceChannels = channels || {};
+function normalizeRecipientChannelMap(recipientChannels) {
+  const sourceChannels = recipientChannels || {};
   return {
     email: sourceChannels.email === true,
     line: sourceChannels.line === true,
     telegram: sourceChannels.telegram === true
   };
-}
-
-function getAggregateRuleChannels(recipientChannels) {
-  const aggregate = { email: false, line: false, telegram: false };
-  Object.keys(recipientChannels || {}).forEach(function(recipientId) {
-    const channels = recipientChannels[recipientId] || {};
-    aggregate.email = aggregate.email || channels.email === true;
-    aggregate.line = aggregate.line || channels.line === true;
-    aggregate.telegram = aggregate.telegram || channels.telegram === true;
-  });
-  return aggregate;
 }
 
 function getRuleDeliveries(settings, rule) {
