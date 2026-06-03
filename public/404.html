@@ -6,16 +6,8 @@
     <title>李伯伯糖葫蘆</title>
     <script>
       (function () {
-        var repoBase = '/leebobo-frontend/';
-        var locationPath = window.location.pathname;
-
-        if (!locationPath.startsWith(repoBase)) {
-          window.location.replace(repoBase);
-          return;
-        }
-
-        var route = locationPath.slice(repoBase.length);
-        var redirectTarget = repoBase + '?p=/' + route
+        var route = window.location.pathname.replace(/^\//, '');
+        var redirectTarget = '/?p=/' + route
           + window.location.search.replace(/^\?/, '&')
           + window.location.hash;
 
