@@ -182,6 +182,59 @@ Email/Password 帳號：
 - 手動新增 Email/Password user，或讓使用者透過未來的註冊流程建立帳號。
 - 確認該 user 的 Email。
 
+新增 Google 後台管理者完整流程：
+
+1. 到 Firebase Console → Authentication → 登入方式，確認 `Google` provider 已啟用。
+2. 到 Firebase Console → Authentication → 設定 → 授權網域，確認後台所在網域已加入：
+   - GitHub Pages：`bbcx1.github.io`
+   - 自訂網域：填入實際網域
+   - 本機測試：`localhost` 或 `127.0.0.1`
+3. 請新管理員到後台 `/admin` 使用 Google 帳戶登入一次。
+4. 第一次登入後若看到「無權限」是正常的，目的只是讓 Firebase Authentication 建立該 Google user。
+5. 到 Firebase Console → Authentication → Users，確認該 Google Email 已出現在使用者清單。
+6. 到專案設定 → 服務帳戶 → Firebase Admin SDK，確認目前專案是 `leebobo-frontend`。
+7. 點「產生新的私密金鑰」下載 service account JSON；此檔不得 commit，也不要放進專案資料夾。
+8. 在 PowerShell 設定環境變數，請改成 service account JSON 的實際路徑，不要使用 `C:\path\to\service-account.json` 範例字串：
+
+```powershell
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\Users\你的帳號\Downloads\leebobo-frontend-firebase-adminsdk-xxxx.json"
+$env:FIREBASE_PROJECT_ID="leebobo-frontend"
+```
+
+9. 檢查 service account JSON 是否屬於正確專案。路徑可改用 `/`，避免 JavaScript 字串中的 `\` 被誤判：
+
+```powershell
+node -e "const fs=require('fs'); const p='C:/Users/你的帳號/Downloads/leebobo-frontend-firebase-adminsdk-xxxx.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); console.log(j.project_id); console.log(j.client_email);"
+```
+
+正確時應輸出：
+
+```text
+leebobo-frontend
+firebase-adminsdk-fbsvc@leebobo-frontend.iam.gserviceaccount.com
+```
+
+10. 設定該 Google Email 為後台管理員。一般共同管理者使用 `admin` role：
+
+```powershell
+npm.cmd run admin:set-claim -- user@gmail.com true admin
+```
+
+主要管理者使用 `owner` role：
+
+```powershell
+npm.cmd run admin:set-claim -- owner@gmail.com true owner
+```
+
+成功時會看到：
+
+```text
+Updated custom claims for user@gmail.com: admin=true role=admin
+The user must sign out and sign in again to refresh the ID token.
+```
+
+11. 請該管理者到後台登出，並用同一個 Google 帳戶重新登入。
+
 新增 Email/Password 後台管理者完整流程：
 
 1. 到 Firebase Console → Authentication → Users → 新增使用者。
@@ -229,33 +282,9 @@ The user must sign out and sign in again to refresh the ID token.
 
 8. 請該管理者到後台登出，並用 Email/Password 重新登入。
 
-PowerShell 若出現 `>>`，代表前一行引號或括號沒有關好；按 `Ctrl + C` 回到正常提示符號後，重新貼上單行指令。
-
-3. 準備 Firebase Admin SDK service account JSON，並設定本機 PowerShell 環境變數：
-
-```powershell
-$env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\service-account.json"
-$env:FIREBASE_PROJECT_ID="leebobo-frontend"
-```
-
-4. 對該 user 設定管理員 claim：
-
-設定主要管理者 owner：
-
-```powershell
-npm.cmd run admin:set-claim -- 你的GoogleEmail@gmail.com true owner
-```
-
-設定一般後台管理者 admin：
-
-```powershell
-npm.cmd run admin:set-claim -- admin@example.com true admin
-```
-
-5. 回到後台，按「登出並切換帳號」。
-6. 重新用同一個 Google 帳戶或 Email/Password 帳號登入。
-
 重點：設定 custom claim 後，舊 token 不會立刻更新，所以一定要登出再登入，ID token 才會帶入 `admin: true` 與 `role`。
+
+PowerShell 若出現 `>>`，代表前一行引號或括號沒有關好；按 `Ctrl + C` 回到正常提示符號後，重新貼上單行指令。
 
 #### GAS admin token 驗證
 

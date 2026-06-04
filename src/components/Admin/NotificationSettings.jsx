@@ -43,6 +43,7 @@ export default function NotificationSettings({
   const rules = settings.rules || {};
   const events = (settings.events || []).filter(event => event.key !== 'testNotification');
   const canManageAllRecipients = settings.canManageAllRecipients === true;
+  const hasNotificationSettingsAccess = canManageAllRecipients || recipients.length > 0;
 
   const updateRecipient = (recipientId, updates) => {
     setSettings({
@@ -176,15 +177,27 @@ export default function NotificationSettings({
           <h3 className="text-2xl font-bold text-gray-800">通知規則設定</h3>
           <p className="text-gray-500 mt-1">後台只顯示遮罩聯絡資料；完整 Email、LINE userId、Telegram chatId 僅由 GAS 端保留。</p>
         </div>
-        <button
-          onClick={onSave}
-          disabled={isSaving}
-          className="px-8 py-3 bg-darkWood text-white font-bold rounded-2xl hover:bg-black transition-colors disabled:opacity-50"
-        >
-          {isSaving ? '儲存中...' : '儲存通知設定'}
-        </button>
+        {hasNotificationSettingsAccess && (
+          <button
+            onClick={onSave}
+            disabled={isSaving}
+            className="px-8 py-3 bg-darkWood text-white font-bold rounded-2xl hover:bg-black transition-colors disabled:opacity-50"
+          >
+            {isSaving ? '儲存中...' : '儲存通知設定'}
+          </button>
+        )}
       </div>
 
+      {!hasNotificationSettingsAccess && (
+        <div className="rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4">
+          <p className="font-bold text-gray-800">尚未開放通知規則設定。</p>
+          <p className="text-sm text-gray-500 mt-1">
+            請 owner 先在共同管理者中新增你的後台登入 Email，完成後重新登入即可看到可管理的通知設定。
+          </p>
+        </div>
+      )}
+
+      {hasNotificationSettingsAccess && (
       <div className="space-y-10">
         <div>
           <div className="flex items-center justify-between gap-4 mb-4">
@@ -391,6 +404,7 @@ export default function NotificationSettings({
           </div>
         </div>
       </div>
+      )}
     </section>
   );
 }
