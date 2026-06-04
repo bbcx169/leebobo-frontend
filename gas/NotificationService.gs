@@ -376,8 +376,7 @@ function getDefaultNotificationSettings() {
 function normalizeNotificationSettings(settings) {
   const defaultSettings = getDefaultNotificationSettingsBase();
   const sourceSettings = settings || {};
-  const sourceRecipients = Array.isArray(sourceSettings.recipients) ? sourceSettings.recipients : [];
-  const recipients = sourceRecipients.length ? sourceRecipients : defaultSettings.recipients;
+  const recipients = Array.isArray(sourceSettings.recipients) ? sourceSettings.recipients : defaultSettings.recipients;
   const normalizedRecipients = recipients.map(function(recipient, index) {
     return {
       id: String(recipient.id || ('recipient_' + (index + 1))).trim(),
@@ -612,7 +611,8 @@ function getDefaultNotificationSettingsBase() {
 }
 
 function normalizeRuleRecipientChannels(sourceRule, defaultRule) {
-  const sourceRecipientChannels = sourceRule.recipientChannels || {};
+  const hasSourceRecipientChannels = Object.prototype.hasOwnProperty.call(sourceRule, 'recipientChannels');
+  const sourceRecipientChannels = hasSourceRecipientChannels ? (sourceRule.recipientChannels || {}) : (defaultRule.recipientChannels || {});
   const normalized = {};
 
   Object.keys(sourceRecipientChannels).forEach(function(recipientId) {
@@ -625,7 +625,7 @@ function normalizeRuleRecipientChannels(sourceRule, defaultRule) {
     return normalized;
   }
 
-  return defaultRule.recipientChannels || {};
+  return hasSourceRecipientChannels ? {} : (defaultRule.recipientChannels || {});
 }
 
 function normalizeRecipientChannelMap(recipientChannels) {
