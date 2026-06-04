@@ -500,6 +500,7 @@ function scopeNotificationSettingsForAuth(settings, authResult) {
   if (!ownRecipient) {
     return {
       events: normalizedSettings.events,
+      canAccessNotificationSettings: false,
       recipients: [],
       rules: scopeRulesToRecipient(normalizedSettings.rules, ''),
       updatedAt: normalizedSettings.updatedAt || ''
@@ -508,6 +509,7 @@ function scopeNotificationSettingsForAuth(settings, authResult) {
 
   return {
     events: normalizedSettings.events,
+    canAccessNotificationSettings: true,
     recipients: [ownRecipient],
     rules: scopeRulesToRecipient(normalizedSettings.rules, ownRecipient.id),
     updatedAt: normalizedSettings.updatedAt || ''
@@ -550,15 +552,18 @@ function isRecipientOwnedByAuth(recipient, authResult) {
 }
 
 function maskNotificationSettingsForAdmin(settings, authResult) {
+  const isOwner = isNotificationOwner(authResult);
+  const canAccessNotificationSettings = isOwner || settings.canAccessNotificationSettings === true;
   const normalizedSettings = normalizeNotificationSettings(settings);
   return {
     events: normalizedSettings.events,
-    rules: normalizedSettings.rules,
+    rules: canAccessNotificationSettings ? normalizedSettings.rules : scopeRulesToRecipient(normalizedSettings.rules, ''),
     updatedAt: normalizedSettings.updatedAt || '',
-    scope: isNotificationOwner(authResult) ? 'owner' : 'self',
+    scope: isOwner ? 'owner' : 'self',
     currentUserEmail: authResult && authResult.email ? String(authResult.email).toLowerCase() : '',
-    canManageAllRecipients: isNotificationOwner(authResult),
-    recipients: (normalizedSettings.recipients || []).map(function(recipient) {
+    canManageAllRecipients: isOwner,
+    canAccessNotificationSettings: canAccessNotificationSettings,
+    recipients: canAccessNotificationSettings ? (normalizedSettings.recipients || []).map(function(recipient) {
       const email = String(recipient.email || '').trim();
       const lineUserId = String(recipient.lineUserId || '').trim();
       const telegramChatId = String(recipient.telegramChatId || '').trim();
@@ -580,7 +585,7 @@ function maskNotificationSettingsForAdmin(settings, authResult) {
         clearLineUserId: false,
         clearTelegramChatId: false
       };
-    })
+    }) : []
   };
 }
 

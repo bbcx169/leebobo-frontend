@@ -43,7 +43,7 @@ export default function NotificationSettings({
   const rules = settings.rules || {};
   const events = (settings.events || []).filter(event => event.key !== 'testNotification');
   const canManageAllRecipients = settings.canManageAllRecipients === true;
-  const hasNotificationSettingsAccess = canManageAllRecipients || recipients.length > 0;
+  const hasNotificationSettingsAccess = settings.canAccessNotificationSettings === true || canManageAllRecipients;
 
   const updateRecipient = (recipientId, updates) => {
     setSettings({
