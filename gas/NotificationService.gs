@@ -547,8 +547,7 @@ function isRecipientOwnedByAuth(recipient, authResult) {
   const email = authResult && authResult.email ? String(authResult.email).trim().toLowerCase() : '';
   if (!email || !recipient) return false;
   const authEmail = String(recipient.authEmail || '').trim().toLowerCase();
-  const notificationEmail = String(recipient.email || '').trim().toLowerCase();
-  return authEmail === email || (!authEmail && notificationEmail === email);
+  return authEmail === email;
 }
 
 function maskNotificationSettingsForAdmin(settings, authResult) {
