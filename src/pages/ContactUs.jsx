@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import useScrollFadeIn from '../hooks/useScrollFadeIn';
+import priceListImage from '../assets/images/Contact/ningxia-tanghulu-price-list.webp';
 
 /**
  * ContactUs 頁面元件
@@ -146,6 +147,28 @@ const ContactUs = () => {
                         ></iframe>
                     </div>
                 </div>
+
+                <section className="mt-16 fade-in-up">
+                    <div className="glass-panel-light rounded-[2rem] shadow-sm p-5 md:p-8 border border-pureWhite/70 overflow-hidden">
+                        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+                            <div>
+                                <p className="text-warmWood font-sans tracking-[0.3em] text-xs md:text-sm mb-3 font-semibold uppercase">Price List</p>
+                                <h2 className="font-serif text-2xl md:text-3xl text-amberRed tracking-widest font-bold">寧夏夜市古早糖葫蘆 商品價目表</h2>
+                            </div>
+                            <p className="text-darkWood/60 font-sans text-sm md:text-base leading-relaxed md:text-right">
+                                現場品項依當日水果與備料狀況供應
+                            </p>
+                        </div>
+                        <div className="bg-pureWhite/80 rounded-[1.5rem] p-2 md:p-3 shadow-inner border border-warmWood/25">
+                            <img
+                                src={priceListImage}
+                                alt="寧夏夜市古早糖葫蘆商品價目表"
+                                className="w-full h-auto rounded-[1.25rem] object-contain"
+                                loading="lazy"
+                            />
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
     );
