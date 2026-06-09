@@ -10,9 +10,9 @@ const PRODUCTS = {
   '3': { name: '鳥梨 (小/喜糖)', price: 20 },
   '4': { name: '蕃茄+鳥梨 (小/喜糖)', price: 20 },
   '5': { name: '承租掃帚', price: 2000 },
-  '6': { name: '蕃茄 (經典)', price: 30 },
-  '7': { name: '蕃茄蜜餞 (經典)', price: 35 },
-  '8': { name: '鳥梨 (經典)', price: 35 }
+  '6': { name: '蕃茄 (經典)', price: 35 },
+  '7': { name: '蕃茄蜜餞 (經典)', price: 40 },
+  '8': { name: '鳥梨 (經典)', price: 60 }
 };
 
 /**

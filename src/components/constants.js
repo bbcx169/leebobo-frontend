@@ -71,7 +71,7 @@ export const products = [
   {
     id: 7,
     name: "鳥梨",
-    price: 35,
+    price: 60,
     image: "https://images.unsplash.com/photo-1610832958506-aa56368176cf?q=80&w=600&auto=format&fit=crop",
     tags: ["傳統風味", "季節限定"],
     description: "重溫夜市經典！嚴選優質鳥梨，遵循古法手工熬製糖衣，金黃外殼亮麗酥脆。"
