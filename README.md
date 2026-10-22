@@ -406,6 +406,28 @@ migration 會將每個通知 rule 寫回為只包含 `enabled` 與 `recipientCha
 | Sheets 同步失敗 | 會 | 不會 | 會 | 主旨：`【系統警示】訂單報表同步失敗 - 編號 {訂單編號}`。內容：訂單報表同步失敗、訂單編號、錯誤訊息。 | 對應 `sheetSyncFailed` 通知規則；預設 Email + Telegram。 |
 | 儲存每日提醒設定 | 不會 | 不會 | 不會 | 不會立即發送通知。 | 只建立 / 更新 GAS 定時 trigger。 |
 
+### GAS Health Check（網址健康檢查）
+
+GAS Web App 的授權可能在程式未變動的情況下失效（例如改密碼、Google 撤銷第三方授權），此時網址會回 HTTP 403，前台送單只會顯示 `Failed to fetch`。為了提早發現，`.github/workflows/gas-health-check.yml` 會定期檢查 GAS 網址。
+
+- **執行時間**：台灣時間每日 08:00、20:00（cron `0 0,12 * * *`，UTC）；GitHub 排程可能延遲數分鐘。
+- **檢查方式**：POST `{"action":"health_check"}` 到 `VITE_GAS_SCRIPT_URL`，只要回 **HTTP 200 且內容為合法 JSON** 即視為正常（GAS 回 `status:error` 表示不支援此 action，仍算正常）。
+- **重試**：失敗會重試 3 次、每次間隔 20 秒，避免偶發延遲誤報。
+- **通知**：3 次皆失敗時透過 Telegram 發送異常原因（如 `HTTP 403`）與 Actions 執行連結，該次 workflow 標示為失敗。
+- **手動測試**：GitHub Actions →「GAS Health Check」→「Run workflow」，勾選「強制發送一則測試通知」可確認 Telegram 是否收得到。
+
+需要的 GitHub Secrets：
+
+| Secret | 說明 |
+|---|---|
+| `VITE_GAS_SCRIPT_URL` | GAS Web App `/exec` 網址（與部署流程共用） |
+| `TELEGRAM_BOT_TOKEN` | Telegram Bot Token |
+| `TELEGRAM_CHAT_ID` | 接收通知的 Chat ID，多個以逗號分隔 |
+
+收到異常通知時：到 Apps Script「部署 → 管理部署作業」確認存取權為「所有人」，並重新授權 / 建立新部署；若網址變更，需同步更新 `.env`、`.env.local` 與 GitHub Secret `VITE_GAS_SCRIPT_URL`。
+
+> 注意：repo 連續 60 天沒有 commit 時，GitHub 會自動停用排程 workflow，需到 Actions 頁面手動重新啟用。
+
 ## Google Sheets 訂單報表
 
 新訂單建立時，前端會：
