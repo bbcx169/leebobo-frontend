@@ -1,0 +1,98 @@
+# GAS Web App 健康檢查：網址未回 HTTP 200 + JSON 時，透過 Telegram 通知
+# 需要的 GitHub Secrets：
+#   VITE_GAS_SCRIPT_URL  - GAS Web App /exec 網址（部署流程已在使用）
+#   TELEGRAM_BOT_TOKEN   - Telegram Bot Token
+#   TELEGRAM_CHAT_ID     - 接收通知的 Chat ID（多個以逗號分隔）
+name: GAS Health Check
+
+on:
+  schedule:
+    - cron: '0 0,12 * * *' # 台灣時間每日 08:00、20:00（= UTC 00:00、12:00）
+  workflow_dispatch:
+    inputs:
+      test_notify:
+        description: '強制發送一則測試通知'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check GAS endpoint
+        id: probe
+        env:
+          GAS_URL: ${{ secrets.VITE_GAS_SCRIPT_URL }}
+        run: |
+          set +e
+          if [ -z "$GAS_URL" ]; then
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "reason=缺少 VITE_GAS_SCRIPT_URL secret" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          ok=false
+          reason=""
+          for attempt in 1 2 3; do
+            code=$(curl -sS -L --max-time 60 -o body.txt -w '%{http_code}' \
+              -H 'Content-Type: text/plain;charset=utf-8' \
+              --data '{"action":"health_check"}' "$GAS_URL")
+            curl_exit=$?
+
+            if [ $curl_exit -ne 0 ]; then
+              reason="curl 失敗 (exit $curl_exit)"
+            elif [ "$code" != "200" ]; then
+              reason="HTTP $code"
+            elif ! jq -e . body.txt > /dev/null 2>&1; then
+              reason="HTTP 200 但回應不是 JSON：$(head -c 120 body.txt | tr '\n' ' ')"
+            else
+              ok=true
+              break
+            fi
+            echo "Attempt $attempt failed: $reason"
+            sleep 20
+          done
+
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+          echo "Result: ok=$ok $reason"
+
+      - name: Notify Telegram
+        if: steps.probe.outputs.ok != 'true' || inputs.test_notify
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_ID }}
+          OK: ${{ steps.probe.outputs.ok }}
+          REASON: ${{ steps.probe.outputs.reason }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT_IDS" ]; then
+            echo "::error::缺少 TELEGRAM_BOT_TOKEN 或 TELEGRAM_CHAT_ID secret"
+            exit 1
+          fi
+
+          now=$(TZ=Asia/Taipei date '+%Y-%m-%d %H:%M')
+          if [ "$OK" = "true" ]; then
+            text="✅ [測試] GAS 健康檢查正常（${now}）"
+          else
+            text="🚨 李伯伯 GAS 網址異常（${now}）
+          原因：${REASON}
+          訂單可能無法送出，請檢查 Apps Script 部署與授權（必要時重新部署）。
+          ${RUN_URL}"
+          fi
+
+          IFS=',' read -ra ids <<< "$TG_CHAT_IDS"
+          for id in "${ids[@]}"; do
+            id=$(echo "$id" | xargs)
+            curl -sS --fail -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${id}" \
+              --data-urlencode "text=${text}" > /dev/null
+          done
+
+      - name: Mark run as failed
+        if: steps.probe.outputs.ok != 'true'
+        run: exit 1
