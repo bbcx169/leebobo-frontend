@@ -7,7 +7,7 @@ name: GAS Health Check
 
 on:
   schedule:
-    - cron: '0 0,12 * * *' # 台灣時間每日 08:00、20:00（= UTC 00:00、12:00）
+    - cron: '0 * * * *' # 每小時整點（UTC）執行一次
   workflow_dispatch:
     inputs:
       test_notify:

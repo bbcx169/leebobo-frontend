@@ -410,7 +410,7 @@ migration 會將每個通知 rule 寫回為只包含 `enabled` 與 `recipientCha
 
 GAS Web App 的授權可能在程式未變動的情況下失效（例如改密碼、Google 撤銷第三方授權），此時網址會回 HTTP 403，前台送單只會顯示 `Failed to fetch`。為了提早發現，`.github/workflows/gas-health-check.yml` 會定期檢查 GAS 網址。
 
-- **執行時間**：台灣時間每日 08:00、20:00（cron `0 0,12 * * *`，UTC）；GitHub 排程可能延遲數分鐘。
+- **執行時間**：每小時整點（cron `0 * * * *`，UTC）；GitHub 排程可能延遲數分鐘。
 - **檢查方式**：POST `{"action":"health_check"}` 到 `VITE_GAS_SCRIPT_URL`，只要回 **HTTP 200 且內容為合法 JSON** 即視為正常（GAS 回 `status:error` 表示不支援此 action，仍算正常）。
 - **重試**：失敗會重試 3 次、每次間隔 20 秒，避免偶發延遲誤報。
 - **通知**：3 次皆失敗時透過 Telegram 發送異常原因（如 `HTTP 403`）與 Actions 執行連結，該次 workflow 標示為失敗。
