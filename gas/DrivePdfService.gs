@@ -53,7 +53,7 @@ function createOrderPdfFile(pdfBlob) {
 
   return {
     id: file.id,
-    url: `https://drive.google.com/uc?export=download&id=${file.id}`
+    url: formatDrivePdfViewUrl(file.id)
   };
 }
 
@@ -84,4 +84,10 @@ function extractDriveFileId(url) {
 
 function escapeDriveQueryValue(value) {
   return String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+function formatDrivePdfViewUrl(urlOrId) {
+  if (!urlOrId) return "";
+  const fileId = extractDriveFileId(urlOrId) || String(urlOrId).trim();
+  return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
 }

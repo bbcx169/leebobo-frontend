@@ -16,7 +16,7 @@ function handleResendPdf(data) {
 
     if (file) {
       blob = file.getBlob().setName(`李伯伯糖葫蘆_訂單明細_${data.orderNumber}.pdf`);
-      directUrl = directUrl || `https://drive.google.com/uc?export=download&id=${file.getId()}`;
+      directUrl = formatDrivePdfViewUrl(directUrl || file.getId());
     } else {
       if (!data.cart) {
         return jsonResponse({

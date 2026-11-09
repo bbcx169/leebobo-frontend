@@ -1,3 +1,4 @@
+import { getPdfViewUrl } from '../../utils/pdfUrl';
 import React, { useMemo, useState, useEffect } from 'react';
 
 export default function DashboardStats({ 
@@ -302,7 +303,7 @@ export default function DashboardStats({
                             <div className="print:hidden">
                               {(order.pdfUrl || order.pdfDownloadUrl) ? (
                                 <a 
-                                  href={order.pdfUrl || order.pdfDownloadUrl} 
+                                  href={getPdfViewUrl(order.pdfUrl || order.pdfDownloadUrl)} 
                                   target="_blank" 
                                   rel="noopener noreferrer" 
                                   onClick={(e) => e.stopPropagation()} 

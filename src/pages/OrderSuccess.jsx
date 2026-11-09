@@ -6,6 +6,7 @@ import { products } from '../constants/data';
 import { db } from '../utils/firebase';
 import { doc as firestoreDoc, updateDoc } from 'firebase/firestore';
 import { sendGasRequestWithNoCorsFallback } from '../utils/gasApi';
+import { getPdfViewUrl } from '../utils/pdfUrl';
 
 const sendGasRequest = async (payload) => {
   return sendGasRequestWithNoCorsFallback(payload, '補發請求已送出，請稍後確認信箱。');
@@ -38,7 +39,7 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
   // 處理 PDF 下載功能
   const handleDownloadPDF = (url) => {
     if (url) {
-      window.open(url, '_blank');
+      window.open(getPdfViewUrl(url), '_blank', 'noopener,noreferrer');
       setIsPdfDownloaded(true);
     } else {
       alert("⚠️ 尚未取得 PDF 下載連結，請稍後再試或聯繫客服。");
@@ -151,16 +152,28 @@ const OrderSuccess = ({ submittedOrder, navigateTo, onNavigate }) => {
         <OrderReceipt order={submittedOrder} products={products} />
         
         <div className="flex flex-col sm:flex-row justify-center gap-4 mb-4 mt-6">
-          <button 
-            onClick={() => handleDownloadPDF(pdfUrl)} 
-            className={`inline-flex items-center justify-center gap-2 text-white py-3.5 px-8 rounded-xl font-bold shadow-md transition-all w-full sm:w-auto ${isPdfDownloaded ? 'bg-[#06C755] hover:bg-[#05b34c]' : 'bg-[#3E2723] hover:bg-[#2A1A17]'}`}
-          >
-            {isPdfDownloaded ? (
-              <><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"></path></svg> 再次下載</>
-            ) : (
-              <><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> 下載明細 (PDF)</>
-            )}
-          </button>
+          {pdfUrl ? (
+            <a 
+              href={getPdfViewUrl(pdfUrl)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setIsPdfDownloaded(true)}
+              className={`inline-flex items-center justify-center gap-2 text-white py-3.5 px-8 rounded-xl font-bold shadow-md transition-all w-full sm:w-auto ${isPdfDownloaded ? 'bg-[#06C755] hover:bg-[#05b34c]' : 'bg-[#3E2723] hover:bg-[#2A1A17]'}`}
+            >
+              {isPdfDownloaded ? (
+                <><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"></path></svg> 再次開啟 / 下載</>
+              ) : (
+                <><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> 查看 / 下載明細 (PDF)</>
+              )}
+            </a>
+          ) : (
+            <button 
+              onClick={() => handleDownloadPDF(pdfUrl)} 
+              className="inline-flex items-center justify-center gap-2 text-white py-3.5 px-8 rounded-xl font-bold shadow-md transition-all w-full sm:w-auto bg-[#3E2723] opacity-70"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> 查看 / 下載明細 (PDF)
+            </button>
+          )}
 
           <button 
             onClick={() => setShowEmailInput(!showEmailInput)} 

@@ -3,6 +3,7 @@ import { products } from '../constants/data';
 import useScrollFadeIn from '../hooks/useScrollFadeIn';
 import OrderReceipt from '../components/OrderReceipt';
 import { sendGasRequestWithNoCorsFallback } from '../utils/gasApi';
+import { getPdfViewUrl } from '../utils/pdfUrl';
 
 // ✨ 新增 Firebase 相關引入
 import { db } from '../utils/firebase';
@@ -133,7 +134,7 @@ const OrderInquiry = ({ setAlertMsg }) => {
 
   const handleDownloadPDF = (url) => {
     if (url) {
-      window.open(url, '_blank');
+      window.open(getPdfViewUrl(url), '_blank', 'noopener,noreferrer');
       setIsPdfDownloaded(true);
     } else {
       setAlertMsg("⚠️ 尚未取得 PDF 下載連結，請稍後再試或聯繫客服。");
@@ -306,9 +307,24 @@ const OrderInquiry = ({ setAlertMsg }) => {
           </div>
 
           <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
-            <button onClick={() => handleDownloadPDF(inqData.pdfDownloadUrl)} className={`inline-flex items-center justify-center gap-2 text-white py-3.5 px-8 rounded-xl font-bold shadow-md transition-all w-full sm:w-auto ${isPdfDownloaded ? 'bg-[#06C755] hover:bg-[#05b34c]' : 'bg-darkWood hover:bg-[#2A1A17]'}`}>
-              {isPdfDownloaded ? "✅ 下載完成" : "📄 下載訂單明細 (PDF)"}
-            </button>
+            {inqData.pdfDownloadUrl ? (
+              <a
+                href={getPdfViewUrl(inqData.pdfDownloadUrl)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsPdfDownloaded(true)}
+                className={`inline-flex items-center justify-center gap-2 text-white py-3.5 px-8 rounded-xl font-bold shadow-md transition-all w-full sm:w-auto ${isPdfDownloaded ? 'bg-[#06C755] hover:bg-[#05b34c]' : 'bg-darkWood hover:bg-[#2A1A17]'}`}
+              >
+                {isPdfDownloaded ? "✅ 再次開啟 / 下載" : "📄 查看 / 下載明細 (PDF)"}
+              </a>
+            ) : (
+              <button
+                onClick={() => handleDownloadPDF(inqData.pdfDownloadUrl)}
+                className="inline-flex items-center justify-center gap-2 text-white py-3.5 px-8 rounded-xl font-bold shadow-md transition-all w-full sm:w-auto bg-darkWood opacity-70"
+              >
+                📄 查看 / 下載明細 (PDF)
+              </button>
+            )}
             <button onClick={() => setShowEmailPrompt(!showEmailPrompt)} className="inline-flex items-center justify-center gap-2 bg-amberRed hover:bg-[#802020] text-white py-3.5 px-8 rounded-xl font-bold shadow-md transition-all w-full sm:w-auto">
               📧 傳送 PDF (Email)
             </button>
