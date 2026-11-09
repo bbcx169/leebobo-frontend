@@ -1,0 +1,1 @@
+function e(e){if(!e)return``;let t=String(e).trim(),n=t.match(/[?&]id=([a-zA-Z0-9_-]+)/);if(n)return`https://drive.google.com/file/d/${n[1]}/view?usp=sharing`;let r=t.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);return r?`https://drive.google.com/file/d/${r[1]}/view?usp=sharing`:t}export{e as t};
